@@ -33,6 +33,7 @@ def main():
     serve=sub.add_parser('serve');serve.add_argument('project');serve.add_argument('--port',type=int,default=18766)
     start=sub.add_parser('start');start.add_argument('project');start.add_argument('--port',type=int,default=18766)
     check=sub.add_parser('check');check.add_argument('project')
+    components=sub.add_parser('components');components.add_argument('project');components.add_argument('--revision')
     imp=sub.add_parser('import-review');imp.add_argument('--store',required=True);imp.add_argument('--workspace',required=True);imp.add_argument('--output',required=True)
     feed=sub.add_parser('feedback');feed.add_argument('project');feed.add_argument('--format',choices=['json','markdown'],default='markdown')
     rev=sub.add_parser('publish');rev.add_argument('project');rev.add_argument('--revision',required=True);rev.add_argument('--root',required=True)
@@ -70,6 +71,9 @@ def main():
             p=Project(args.project);count=0
             for revision in p.revisions:count+=p.validate_assets(revision)
             print(json.dumps({'project':p.id,'revisions':len(p.revisions),'images':count,'ok':True}))
+        elif args.command=='components':
+            from .components import load
+            print(json.dumps(load(Project(args.project),args.revision),ensure_ascii=False,indent=2))
         elif args.command=='feedback':
             from .workflow import handoff
             result=handoff(args.project);print(json.dumps(result,ensure_ascii=False,indent=2) if args.format=='json' else result['markdown'])

@@ -24,6 +24,7 @@ var C,state,device,draw,resolveState,RIG;
   const rel=(C.image_template||'screens/{device}/{state}.png').replace('{device}',device).replace('{state}',state);
   const url='/revisions/'+encodeURIComponent(RIG.revision)+'/'+rel.split('/').map(encodeURIComponent).join('/');$('#image').src=url;$('#image').alt=(C.labels?.[state]||state)+' · '+d.name;$('#raw').href=url;history.replaceState(null,'',location.pathname+location.search+'#'+state+'@'+device);
  };
+ const elements=document.createElement('a');elements.href='/components.html'+(params.has('revision')?'?revision='+encodeURIComponent(RIG.revision):'');elements.textContent='公共元素集';elements.id='component-library-link';$('.revision-row').append(elements);
  draw();const script=document.createElement('script');script.src='/assets/review.js';script.onload=()=>{const checks=document.createElement('script');checks.src='/assets/page-checks.js';document.body.append(checks)};document.body.append(script);
  // Follow the latest revision in this tab; explicitly selected historical revisions remain pinned.
  setInterval(async()=>{if(params.has('revision'))return;try{const r=await fetch('/api/project',{cache:'no-store'});if(!r.ok)return;const next=await r.json();if(next.revision!==RIG.revision){if(window.rigCanRefresh&&!window.rigCanRefresh()){$('#error').textContent='新版本 '+next.revision+' 已就绪，请先保存当前评论；保存后本页会更新。';return}location.reload()}}catch{}},3000);

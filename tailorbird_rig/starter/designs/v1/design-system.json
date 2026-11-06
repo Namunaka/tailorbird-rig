@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "id": "example-elements",
+  "version": "1.0.0",
+  "title": "通用示例元素集",
+  "description": "合成示例，项目可定义自己的品牌与公共组件。相同语义复用同一组件 ID；差异通过命名变体表达。",
+  "tokens": {"background":"#101216","surface":"#202731","text":"#edf1f6","muted":"#aab4c0","brand":"#5269d9","onBrand":"#ffffff","border":"#536071","success":"#26814f","danger":"#db5757","radius":12,"controlHeight":48,"spacing":16,"fontSize":16,"borderWidth":1},
+  "components": [
+    {"id":"back-button","kind":"back","label":"返回","description":"统一返回图形、触控范围与圆角。","props":{"label":"返回"},"variants":[{"id":"default","label":"默认"},{"id":"disabled","label":"不可用","props":{"state":"disabled"}}]},
+    {"id":"primary-action","kind":"button","label":"主确认按钮","description":"提交、保存等主要操作共用；业务只替换文案。","props":{"label":"确认","tone":"primary"},"variants":[{"id":"default","label":"默认"},{"id":"disabled","label":"不可用","props":{"state":"disabled"}},{"id":"loading","label":"处理中","props":{"state":"loading","label":"处理中"}}]},
+    {"id":"secondary-action","kind":"button","label":"次要按钮","props":{"label":"取消","tone":"secondary"},"variants":[{"id":"default","label":"默认"},{"id":"disabled","label":"不可用","props":{"state":"disabled"}}]},
+    {"id":"text-field","kind":"input","label":"输入框","props":{"label":"名称","placeholder":"请输入名称"},"variants":[{"id":"default","label":"默认"},{"id":"focus","label":"聚焦","props":{"state":"focus"}},{"id":"error","label":"错误","props":{"state":"error","message":"请检查输入内容"}},{"id":"disabled","label":"不可用","props":{"state":"disabled"}}]},
+    {"id":"agreement-check","kind":"checkbox","label":"勾选框","props":{"label":"已阅读并同意相关说明"},"variants":[{"id":"default","label":"未勾选"},{"id":"checked","label":"已勾选","props":{"state":"checked"}},{"id":"disabled","label":"不可用","props":{"state":"disabled"}}]},
+    {"id":"content-card","kind":"card","label":"内容卡片","props":{"title":"卡片标题","text":"共用间距、背景、边框与圆角。"}},
+    {"id":"period-tabs","kind":"segmented","label":"分段切换","props":{"items":["全部","本周","本月"],"selected":0}},
+    {"id":"status-note","kind":"notice","label":"状态提示","props":{"text":"操作已完成","tone":"success"}},
+    {"id":"confirm-actions","kind":"stack","label":"确认操作组","description":"组合次要与主要操作，复用子组件。","props":{"direction":"horizontal"},"children":["secondary-action","primary-action"]}
+  ]
+}

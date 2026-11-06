@@ -98,6 +98,29 @@ class CoreTests(unittest.TestCase):
 if __name__=='__main__':unittest.main()
 
 class AnimationAndGuardTests(unittest.TestCase):
+ def test_shared_component_registry_and_publish_validation(self):
+  from tailorbird_rig.components import validate,load
+  import copy
+  with tempfile.TemporaryDirectory() as t:
+   root=Path(t)/'project';shutil.copytree(Path(__file__).parents[1]/'tailorbird_rig/starter',root);config=root/'rig.json';project=Project(config)
+   bundle=load(project);self.assertFalse(bundle['example']);self.assertEqual(len(bundle['system']['components']),9)
+   invalid=copy.deepcopy(bundle['system']);invalid['components'].append(copy.deepcopy(invalid['components'][0]))
+   with self.assertRaises(ValueError):validate(invalid)
+   invalid=copy.deepcopy(bundle['system']);invalid['components'][-1]['children']=['confirm-actions']
+   with self.assertRaises(ValueError):validate(invalid)
+   candidate=root/'designs/v2';shutil.copytree(root/'designs/v1',candidate);manifest=json.loads((candidate/'coverage.json').read_text());manifest['component_usage']={'welcome':['unknown-control']};atomic(candidate/'coverage.json',manifest)
+   with self.assertRaises(ValueError):activate(config,'v2',candidate)
+   self.assertEqual(Project(config).current,'v1')
+   manifest['component_usage']={'welcome':['primary-action:loading']};atomic(candidate/'coverage.json',manifest);activate(config,'v2',candidate)
+   self.assertEqual(load(Project(config))['usage']['welcome'],['primary-action:loading'])
+   self.assertIn('公共元素集',handoff(config)['markdown'])
+ def test_component_changes_invalidate_page_acceptance(self):
+  from tailorbird_rig.page_checks import snapshot,confirm
+  with tempfile.TemporaryDirectory() as t:
+   root=Path(t)/'project';shutil.copytree(Path(__file__).parents[1]/'tailorbird_rig/starter',root);config=root/'rig.json';store=ReviewStore(config)
+   item=snapshot(store,'v1','phone-a')['pages']['welcome'];confirm(store,dict(revision='v1',page='welcome',device='phone-a',**{k:item[k] for k in ('content_sha256','feedback_sha256')}))
+   candidate=root/'designs/v2';shutil.copytree(root/'designs/v1',candidate);system=json.loads((candidate/'design-system.json').read_text());system['tokens']['radius']=24;atomic(candidate/'design-system.json',system);activate(config,'v2',candidate)
+   self.assertEqual(snapshot(store,'v2','phone-a')['pages']['welcome']['status'],'default')
  def test_authoring_and_rebuild(self):
   from tailorbird_rig.lottie_tools import build_animation,inspect_animation,create_bundle
   for motion in ['bounce','pulse','draw']:

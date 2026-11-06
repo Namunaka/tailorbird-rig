@@ -1,5 +1,7 @@
 # Tailorbird Rig
 
+[简体中文](README.md) | [English](README.en.md)
+
 **面向 AI agent 协作的本地设计评审 harness：新建界面、多尺寸看稿、画图批注、交接问题、发布版本，并在原标签页更新。**
 
 Local design review harness for AI-assisted UI design, persistent visual feedback, versioned revisions, and reproducible Lottie authoring.
@@ -24,7 +26,7 @@ tailorbird-rig check workspaces/demo/rig.json
 tailorbird-rig start workspaces/demo/rig.json --port 18766
 ```
 
-浏览器打开 **http://127.0.0.1:18766/**。`start` 后台启动或复用匹配的服务，不打开新标签页；日志和 PID 在项目 `.rig/` 下。前台运行使用 `tailorbird-rig serve workspaces/demo/rig.json --port 18766`，按 Ctrl+C 停止。
+浏览器打开 [http://127.0.0.1:18766/](http://127.0.0.1:18766/)。`start` 后台启动或复用匹配的服务，不打开新标签页；日志和 PID 在项目 `.rig/` 下。前台运行使用 `tailorbird-rig serve workspaces/demo/rig.json --port 18766`，按 Ctrl+C 停止。
 
 服务仅监听本机，一个反馈目录只允许一个 HTTP 服务；不同项目使用不同端口。不提供多人远程托管或登录账户。
 
@@ -38,7 +40,7 @@ tailorbird-rig start workspaces/demo/rig.json --port 18766
 4. Agent 按问题号处理，记录结果与证据，生成独立的新设计版本并发布。
 5. 跟随最新版的网页在原标签页更新，继续验稿即可。
 
-固定工具包括浏览、选择/移动、画笔、矩形框、位置评论、颜色/粗细、撤销和删除。中间整块区域及图外留白都能标记；输入文字时 Delete 只编辑文字。附件支持上传、粘贴和拖入。
+固定工具包括画笔、矩形框、位置评论、颜色/粗细、撤销和删除。默认直接浏览，已有标记直接点击选择、拖动移动；画完自动结束绘制，点击已启用的工具或按 Esc 也可结束，不单设浏览和选择按钮。中间整块区域及图外留白都能标记；输入文字时 Delete 只编辑文字。附件支持上传、粘贴和拖入。
 
 批注按**页面 × 尺寸 × 版本**隔离，保存源图 SHA256、评论修改和几何移动历史、撤回记录及稳定问题号。已完成问题收到补充会沿原号重开。保存评论只是记录反馈，开始修改仍由对话中的 agent 执行。
 
@@ -129,6 +131,44 @@ tailorbird-rig resolve workspaces/demo/rig.json 12 \
 `resolve` 将处理结果绑定到当前稿件内容，因此应先发布本轮新稿，再回写问题；它只会产生黄色待复查提示，不会替用户确认。绿色确认只由用户在网页点击。
 
 默认每 3 秒检测新版本，在原标签页刷新并保留页面/尺寸选择。有未保存评论、上传或绘制时延后更新；主动选择的历史版本保持固定。设计已修改与用户已验收分别记录。
+
+## 公共元素集与设计一致性
+
+网页顶部「公共元素集」提供按设计版本查看的组件目录、tokens、状态预览、搜索、定义引用和 JSON 下载。通用示例包含返回、主确认、次要按钮、输入框、勾选、内容卡片、分段切换、状态提示及确认操作组。默认/不可用/加载/聚焦/错误/已勾选通过命名变体表达，不在各页面临时画另一套控件。
+
+项目的每个设计版本在 `design-system.json` 维护自己的规范；框架只提供组件渲染器。注册的定义支持颜色、圆角、控件高度、字号、间距、边框及组件/变体覆盖。`stack` 可通过子组件 ID 组合业务公共组件。新界面先复用现有 ID；发现明显需要复用的模式，先登记新组件，再在页面引用。
+
+在 `coverage.json` 声明规范和页面使用的组件：
+
+```json
+"design_system": "design-system.json",
+"require_component_usage": true,
+"component_usage": {
+  "welcome": ["back-button", "primary-action:default"]
+}
+```
+
+`check` 和 `publish` 校验重复 ID、无效 tokens、循环组合、未注册的组件/变体。启用 `require_component_usage` 时，每个页面都必须声明引用。查看规范使用 `tailorbird-rig components workspaces/demo/rig.json`。旧项目没有规范文件时展示通用示例并明确提示，不将示例冒充产品已确认的样式。
+
+HTML 设计页面可使用同一渲染器，保证元素集和设计页的控件来自相同定义：
+
+```html
+<link rel="stylesheet" href="/assets/component-kit.css">
+<div id="actions"></div>
+<script src="/assets/component-kit.js"></script>
+<script>
+fetch('/api/components').then(r => r.json()).then(({system}) => {
+  document.querySelector('#actions').append(
+    RigComponents.render(system, 'back-button'),
+    RigComponents.render(system, 'primary-action', {variant: 'default', label: '保存'})
+  );
+});
+</script>
+```
+
+业务文案可以替换；样式和状态差异应登记为组件或命名变体。历史页面应使用 `?revision=版本ID` 读取匹配的元素集。实际产品的 ArkUI/SwiftUI 等实现也应引用同一规范，但本工程不自动生成这些原生控件。
+
+新版本复制规范并递增元素集版本，保留旧定义。元素集改变会使旧的界面确认失效。声明引用不能自动证明 PNG 中每个像素都符合规范，仍需要渲染来源和视觉检查；框架不会声称能从截图自动识别全部组件。
 
 ## Lottie 动画工作台
 

@@ -13,6 +13,11 @@ def handoff(config):
            '普通设计对话只修改项目设计、配置与生成器；不得修改固定框架或重封完整性基线。',
            '按原问题号逐项处理，先读取原稿、批注坐标及附图；完成后回写处理说明和证据。',
            '所有问题处理后发布新修订；保持同一看稿地址，在现有标签页刷新，不新开标签页。','']
+    from .components import load
+    elements=load(project)
+    lines += ['公共元素集：'+elements['source'],'元素集版本：'+elements['system']['version'],
+              '先复用公共组件与设计 tokens；新增可复用元素先登记到项目元素集，避免各页面重复画相同控件。',
+              '元素集为通用示例，尚未接入项目专属规范。' if elements['example'] else '项目元素集已接入；在新设计版本中维护定义与页面引用。','']
     for issue in pending:
         lines += [f'## 问题 {issue["number"]}：{issue.get("title") or issue.get("user_quote","")}',
                   issue.get('user_quote',''),f'来源：{issue.get("revision","")} / {issue.get("page","")} / {issue.get("device","")}']

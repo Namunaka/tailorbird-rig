@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>公共元素集 · Tailorbird Rig</title>
+<link rel="stylesheet" href="/assets/component-kit.css">
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101216;color:#edf1f6;font:15px/1.7 system-ui,sans-serif}header,main{max-width:1400px;margin:auto;padding:24px}header{border-bottom:1px solid #ffffff22}a{color:#b5cbff}h1,h2,h3{margin:4px 0 12px}p{color:#aab4c0}button,input,select{font:inherit}header button,header select,#search{padding:10px;border-radius:8px;background:#202731;color:#edf1f6;border:1px solid #536071}.toolbar{display:flex;gap:12px;flex-wrap:wrap;align-items:center}.component-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:20px}.component-entry{border:1px solid #536071;border-radius:16px;padding:20px;min-width:0}.component-entry code{font-size:12px;overflow-wrap:anywhere}details{margin-top:14px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}.component-preview{padding:18px;margin:12px 0;border:1px dashed #536071;border-radius:12px;min-width:0}.variant-label{font-size:12px;color:#aab4c0}.tokens{display:flex;flex-wrap:wrap;gap:12px}.token{padding:10px;border:1px solid #536071;border-radius:8px}.swatch{display:inline-block;width:20px;height:20px;margin-right:8px;vertical-align:middle;border:1px solid #ffffff55}#error{color:#ffaeae}
+</style>
+<header><a id="back" href="/">← 返回设计评审</a><h1>公共元素集</h1><p id="context">正在读取项目规范…</p><p>页面设计复用这里的组件 ID、tokens 和命名变体。新元素先登记再使用；业务文案可替换，控件样式统一修改定义。</p><div class="toolbar"><label>设计版本 <select id="version"></select></label><input id="search" aria-label="查找组件" placeholder="查找组件名称或 ID"><button id="download">下载元素规范 JSON</button></div><p id="error" role="alert"></p></header>
+<main><section><h2>设计 Tokens</h2><div class="tokens" id="tokens"></div></section><h2>组件与状态</h2><p id="coverage"></p><div class="component-grid" id="components"></div></main>
+<script src="/assets/component-kit.js"></script><script src="/assets/components-view.js"></script></html>

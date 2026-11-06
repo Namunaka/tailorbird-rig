@@ -42,6 +42,9 @@ class Handler(BaseHTTPRequestHandler):
                 else:self.respond(200,data)
                 return
             if path=='/api/project': self.respond(200,project.public(self.revision)); return
+            if path=='/api/components':
+                from .components import load
+                self.respond(200,load(project,self.revision));return
             if path=='/api/review': self.respond(200,store.snapshot(self.revision)); return
             if path=='/api/page-checks':
                 from .page_checks import snapshot
@@ -51,6 +54,7 @@ class Handler(BaseHTTPRequestHandler):
                 with store.lock: store.recover(); self.respond(200,read(store.root/'issues.json',{}))
                 return
             if path=='/lottie.html':self.file(WEB/'lottie.html');return
+            if path=='/components.html':self.file(WEB/'components.html');return
             if path in ['/','/index.html','/issues.html']: self.file(WEB/('issues.html' if path=='/issues.html' else 'index.html')); return
             if path.startswith('/assets/'):
                 target=confined(WEB,path[8:])

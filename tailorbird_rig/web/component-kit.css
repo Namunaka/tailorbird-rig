@@ -1,0 +1,15 @@
+.rig-element{box-sizing:border-box;font:var(--rig-fontSize)/1.5 system-ui,sans-serif;color:var(--rig-text);width:100%;min-width:0}
+.rig-element *{box-sizing:border-box;font:inherit}
+.rig-element .rig-control{min-height:var(--rig-controlHeight);border-radius:var(--rig-radius);padding:10px var(--rig-spacing);border:var(--rig-borderWidth) solid var(--rig-border);color:var(--rig-text);background:var(--rig-surface);display:flex;align-items:center;justify-content:center;gap:8px;width:100%}
+.rig-element button{cursor:pointer}.rig-element button:disabled{cursor:default;opacity:.45}
+.rig-element button:focus-visible,.rig-element input:focus-visible{outline:2px solid var(--rig-brand);outline-offset:3px}
+.rig-element .rig-primary{background:var(--rig-brand);border-color:var(--rig-brand);color:var(--rig-onBrand)}
+.rig-element .rig-back{width:var(--rig-controlHeight);padding:0}.rig-back-icon{font:36px/1 system-ui}
+.rig-element .rig-field{display:grid;gap:8px}.rig-element .rig-field .rig-control{justify-content:start}
+.rig-element .rig-control[aria-invalid=true]{border-color:var(--rig-danger)}.rig-element .rig-focus{outline:2px solid var(--rig-brand);outline-offset:2px}.rig-error{color:var(--rig-danger)}
+.rig-element .rig-check{display:flex;align-items:center;gap:10px;min-height:var(--rig-controlHeight)}.rig-check input{width:22px;height:22px;accent-color:var(--rig-brand)}
+.rig-element .rig-card{border:var(--rig-borderWidth) solid var(--rig-border);border-radius:var(--rig-radius);background:var(--rig-surface);padding:var(--rig-spacing)}.rig-card p{margin:8px 0 0;color:var(--rig-muted)}
+.rig-element .rig-segments{display:flex;border:var(--rig-borderWidth) solid var(--rig-border);border-radius:var(--rig-radius);overflow:hidden}.rig-segments button{flex:1;min-height:var(--rig-controlHeight);border:0;background:var(--rig-surface);color:var(--rig-muted);padding:8px}.rig-segments button[aria-pressed=true]{background:var(--rig-brand);color:var(--rig-onBrand)}
+.rig-notice{border-inline-start:3px solid var(--rig-success);background:var(--rig-surface);padding:var(--rig-spacing);border-radius:var(--rig-radius)}
+.rig-stack{display:flex;flex-direction:column;gap:var(--rig-spacing)}.rig-stack[data-direction=horizontal]{flex-direction:row}
+.rig-spinner{width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:rig-spin 1s linear infinite}@keyframes rig-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.rig-spinner{animation:none}}

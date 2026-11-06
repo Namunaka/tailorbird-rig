@@ -16,6 +16,9 @@ def content_digest(project, revision, page, device):
     root,manifest=project.revision(revision)
     from .config import confined
     parts=[image_digest(project,revision,page,device)]
+    from .components import load
+    elements=load(project,revision)
+    if not elements['example']:parts.append(elements['sha256'])
     for animation in manifest.get('animations',[]):
         if animation.get('pages') and page not in animation['pages']:continue
         path=confined(root,animation['path']);stat=path.stat()

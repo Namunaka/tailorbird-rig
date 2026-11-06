@@ -72,6 +72,8 @@ class Project:
 
     def validate_assets(self, revision=None):
         ident=revision or self.current;root,manifest=self.revision(ident);count=0
+        from .components import load
+        load(self,ident)
         for device in manifest['devices']:
             for state in manifest['states']:
                 if not self.image(ident,state,device['id']).is_file():raise ConfigError('Missing image: '+device['id']+'/'+state)
