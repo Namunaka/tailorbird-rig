@@ -1,0 +1,65 @@
+{
+  "note": "Synthetic layout fixtures only. Supply verified target dimensions in each private project.",
+  "devices": [
+    {
+      "w": 402,
+      "h": 890,
+      "id": "phone-a",
+      "name": "手机 A · 示例",
+      "approximate": true,
+      "note": "Synthetic layout fixture; not a manufacturer device specification."
+    },
+    {
+      "w": 402,
+      "h": 874,
+      "id": "phone-b",
+      "name": "手机 B · 示例",
+      "approximate": true,
+      "note": "Synthetic layout fixture; not a manufacturer device specification."
+    },
+    {
+      "w": 460,
+      "h": 672,
+      "form": "folded",
+      "id": "fold-a-closed",
+      "name": "折叠屏 A · 折叠",
+      "approximate": true,
+      "note": "Synthetic layout fixture; not a manufacturer device specification."
+    },
+    {
+      "w": 940,
+      "h": 665,
+      "form": "expanded",
+      "id": "fold-a-open",
+      "name": "折叠屏 A · 展开",
+      "approximate": true,
+      "note": "Synthetic layout fixture; not a manufacturer device specification."
+    },
+    {
+      "w": 466,
+      "h": 678,
+      "form": "folded",
+      "id": "fold-b-closed",
+      "name": "折叠屏 B · 折叠",
+      "approximate": true,
+      "note": "Synthetic layout fixture; not a manufacturer device specification."
+    },
+    {
+      "w": 890,
+      "h": 626,
+      "form": "expanded",
+      "id": "fold-b-open",
+      "name": "折叠屏 B · 展开",
+      "approximate": true,
+      "note": "Synthetic layout fixture; not a manufacturer device specification."
+    },
+    {
+      "w": 402,
+      "h": 890,
+      "id": "phone-c",
+      "name": "手机 C · 示例",
+      "approximate": true,
+      "note": "Synthetic layout fixture; not a manufacturer device specification."
+    }
+  ]
+}

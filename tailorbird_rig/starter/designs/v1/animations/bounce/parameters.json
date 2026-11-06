@@ -1,0 +1,9 @@
+{
+  "name": "Motion study",
+  "motion": "bounce",
+  "color": "#1478ff",
+  "duration": 2,
+  "width": 480,
+  "height": 360,
+  "fps": 60
+}

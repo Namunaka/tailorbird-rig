@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tailorbird-rig"
+version = "0.1.0"
+description = "Local, version-aware design review harness with persistent visual feedback"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+dependencies = ["Pillow>=10"]
+
+[project.scripts]
+tailorbird-rig = "tailorbird_rig.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["tailorbird_rig*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+tailorbird_rig = ["framework.lock.json", "web/*", "web/vendor/*", "starter/rig.json", "starter/designs/*/*.json", "starter/designs/*/screens/*/*.png", "starter/designs/*/animations/*/*"]

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "starter",
+  "title": "设计评审示例",
+  "description": "机型切换、整块画布批注与反馈闭环。替换 designs 下的设计图即可接入自己的项目。",
+  "current_revision": "v1",
+  "data_dir": ".rig",
+  "issue_prefix": "RIG",
+  "revisions": [
+    {
+      "id": "v1",
+      "label": "v1 · 初稿",
+      "root": "designs/v1"
+    }
+  ],
+  "groups": [
+    {
+      "label": "示例流程",
+      "states": [
+        "welcome",
+        "form",
+        "done"
+      ]
+    }
+  ],
+  "links": []
+}
