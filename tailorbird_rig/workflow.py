@@ -4,6 +4,12 @@ import json
 from .config import Project
 from .store import ReviewStore, read, atomic
 
+SCOPE_GUIDANCE=(
+    '批注标记的是问题发生的位置。逐条对照当前版本中同一功能的各机型、折叠形态和相关状态，'
+    '判断问题只出现在单张图、部分机型，还是共用设计导致全部受影响。'
+    '结合用户补充和实际稿件修复所有受影响的变体，逐一验证并用原问题号记录影响范围和证据。'
+)
+
 def handoff(config):
     store=ReviewStore(config); snapshot=store.snapshot(); project=store.project
     with store.lock: issues=read(store.root/'issues.json',{})
@@ -12,6 +18,7 @@ def handoff(config):
            '固定框架目录：'+str(Path(__file__).resolve().parent),
            '普通设计对话只修改项目设计、配置与生成器；不得修改固定框架或重封完整性基线。',
            '按原问题号逐项处理，先读取原稿、批注坐标及附图；完成后回写处理说明和证据。',
+           SCOPE_GUIDANCE,
            '所有问题处理后发布新修订；保持同一看稿地址，在现有标签页刷新，不新开标签页。','']
     from .components import load
     elements=load(project)
@@ -21,12 +28,13 @@ def handoff(config):
     for issue in pending:
         lines += [f'## 问题 {issue["number"]}：{issue.get("title") or issue.get("user_quote","")}',
                   issue.get('user_quote',''),f'来源：{issue.get("revision","")} / {issue.get("page","")} / {issue.get("device","")}']
+        if issue.get('scope_note'):lines.append('用户补充范围：'+issue['scope_note'])
         mark=next((m for m in snapshot['marks'] if m['id']==issue.get('annotation_id')),None)
         if mark: lines += [f'源图SHA256：{mark.get("image_sha256","")}',f'批注：{json.dumps(mark,ensure_ascii=False)}']
         for attachment in issue.get('attachments',[]): lines.append('附图：'+str(store.root/'images'/attachment['id']))
         lines.append('')
     if not pending: lines.append('暂无待处理问题。')
-    return {'project':project.id,'revision':project.current,'issues':pending,'markdown':'\n'.join(lines)}
+    return {'project':project.id,'revision':project.current,'issues':pending,'scope_guidance':SCOPE_GUIDANCE,'markdown':'\n'.join(lines)}
 
 def activate(config, revision, root):
     store=ReviewStore(config)

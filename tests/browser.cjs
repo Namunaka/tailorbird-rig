@@ -39,11 +39,21 @@ const check=(name,pass)=>{checks.push({name,pass});if(!pass)throw Error(name)};
  await p.evaluate(bytes=>{const data=new DataTransfer();data.items.add(new File([Uint8Array.from(atob(bytes),c=>c.charCodeAt(0))],'pasted.png',{type:'image/png'}));document.dispatchEvent(new ClipboardEvent('paste',{clipboardData:data,bubbles:true,cancelable:true}))},bytes);await p.waitForFunction(()=>document.querySelectorAll('#review-attachments img').length===1);await p.locator('#review-add-comment').click();await saved();check('paste uploads image and creates general comment',(await data()).marks.some(m=>m.device==='phone-b'&&m.kind==='page'&&m.comment.attachments.length===1));
  await p.getByRole('button',{name:'手机 C · 示例',exact:true}).click();await p.evaluate(bytes=>{const data=new DataTransfer();data.items.add(new File([Uint8Array.from(atob(bytes),c=>c.charCodeAt(0))],'dropped.png',{type:'image/png'}));document.querySelector('#review-panel').dispatchEvent(new DragEvent('drop',{dataTransfer:data,bubbles:true,cancelable:true}))},bytes);await p.waitForFunction(()=>document.querySelectorAll('#review-attachments img').length===1);await p.locator('#review-add-comment').click();await saved();check('drag/drop uploads image', (await data()).marks.some(m=>m.device==='phone-c'&&m.comment?.attachments.length===1));
  const bundle=await(await p.request.get(base+'/api/handoff')).json();check('handoff includes numbered feedback and attachment provenance',bundle.issues.length===3&&bundle.markdown.includes('SHA256')&&bundle.markdown.includes('images/'));
- await p.locator('#start-work:not([disabled])').click();
- await p.waitForFunction(()=>document.querySelector('#codex-work-status').textContent.includes('本轮已结束'));
- check('start work resumes the bound session with pending issue IDs',
+ check('handoff prompts cross-device and state review',bundle.scope_guidance.includes('各机型、折叠形态和相关状态')&&bundle.markdown.includes(bundle.scope_guidance));
+ check('review toolbar offers handoff without a start task card',await p.locator('#start-work').count()===0&&await p.locator('#handoff').isVisible());
+ const work=await p.request.post(base+'/api/codex-work',{headers:{Origin:base},data:{revision:'v1'}});
+ check('existing local work endpoint accepts the configured revision',work.status()===202);
+ let workState;
+ for(let attempt=0;attempt<50;attempt++){
+  workState=(await(await p.request.get(base+'/api/codex-work')).json()).state;
+  if(workState==='completed'||workState==='failed')break;
+  await new Promise(resolve=>setTimeout(resolve,100));
+ }
+ check('local work endpoint reports completion',workState==='completed');
+ check('local work endpoint resumes the bound session with pending issue IDs',
   fs.readFileSync(path.join(temp,'args'),'utf8').includes('resume --skip-git-repo-check '+sourceId)&&
-  fs.readFileSync(path.join(temp,'prompt'),'utf8').includes('待处理问题编号：'+bundle.issues.map(i=>i.number).join('、')));
+  fs.readFileSync(path.join(temp,'prompt'),'utf8').includes('待处理问题编号：'+bundle.issues.map(i=>i.number).join('、'))&&
+  fs.readFileSync(path.join(temp,'prompt'),'utf8').includes(bundle.scope_guidance));
  // Publishing creates a new revision and refreshes this tab after unsaved work is saved.
  await p.locator('#review-text').fill('尚未保存的新意见');fs.cpSync(path.join(project,'designs/v1'),path.join(project,'designs/v2'),{recursive:true});cp.execFileSync(python,['-m','tailorbird_rig','publish',config,'--revision','v2','--root',path.join(project,'designs/v2')],{cwd:root});await p.waitForTimeout(3600);check('unsaved feedback blocks auto-refresh',await p.locator('#revision').inputValue()==='v1'&&(await p.locator('#error').textContent()).includes('新版本'));
  await p.locator('#review-add-comment').click();await saved();await p.waitForFunction(()=>document.querySelector('#revision')?.value==='v2',undefined,{timeout:12000});await p.getByText('已连接本机批注',{exact:true}).waitFor();check('new revision loads in the same tab',context.pages().length===1);check('new revision keeps page and device',p.url().endsWith('#welcome@phone-c'));check('old revision annotations not drawn on new images',await p.locator('.review-card').count()===0);
@@ -87,13 +97,34 @@ const check=(name,pass)=>{checks.push({name,pass});if(!pass)throw Error(name)};
  const confirmAll=p.locator('#page-check-all');
  const singleBox=await confirmation.boundingBox(),allBox=await confirmAll.boundingBox();
  check('confirm all sits to the right of the single confirmation',allBox.x>singleBox.x&&allBox.y===singleBox.y);
- await confirmAll.click();
+ const formChecks=p.waitForResponse(r=>r.url().includes('/api/page-checks?')&&r.url().includes('page=form'));
+ await p.locator('#states [data-page="form"]').click();
+ await formChecks;
+ const doneChecks=/\/api\/page-checks\?.*\bpage=done$/;
+ let release,requested,calls=0;
+ const delayed=new Promise(resolve=>{release=resolve}),started=new Promise(resolve=>{requested=resolve});
+ await p.route(doneChecks,async route=>{calls++;requested();await delayed;await route.continue()});
+ try{
+  await p.locator('#states [data-page="done"]').click();
+  await started;
+  await p.waitForTimeout(3200);
+  check('polling does not replace an outstanding page status request',calls===1);
+  await confirmAll.click({timeout:2000});
+  check('changed draft accepts batch confirmation while status loads',await p.locator('#page-check-state').textContent()==='正在确认全部机型…');
+ }finally{release()}
  await p.waitForFunction(()=>document.querySelector('#states [data-page="done"]').dataset.check==='confirmed');
+ await p.unroute(doneChecks);
  check('confirm all paints this page 100% and all seven devices green',await nav.locator('.page-review-percent').textContent()==='100%'&&await p.locator('#devices [data-check=confirmed]').count()===7);
  check('confirm all only counts the current page',await p.locator('#overall-review-progress progress').evaluate(b=>b.value===7&&b.max===21));
  await p.reload();
  await confirmation.and(p.locator('[aria-pressed=true]:not([disabled])')).waitFor();
  check('batch confirmation persists after reload',await nav.getAttribute('data-check')==='confirmed');
+ await p.getByRole('button',{name:'全部取消',exact:true}).click();
+ await p.waitForFunction(()=>document.querySelector('#overall-review-progress progress').value===0);
+ check('cancel all clears the page and device confirmations',await nav.locator('.page-review-percent').textContent()==='0%'&&await p.locator('#devices [data-check=confirmed]').count()===0);
+ await p.reload();
+ await p.getByRole('button',{name:'全部确认',exact:true}).and(p.locator(':not([disabled])')).waitFor();
+ check('batch cancellation persists after reload',await nav.locator('.page-review-percent').textContent()==='0%');
  await p.goto(base+'/lottie.html');await p.waitForFunction(()=>window.rigLottie?.ready);check('Lottie SVG ready',await p.locator('#player svg').count()===1);
  await p.locator('#play').click();await p.waitForFunction(()=>window.rigLottie.completed===1);check('SVG complete playback',await p.locator('#status').textContent()==='完整播放结束');
  await p.locator('#timeline').evaluate(e=>{e.value='30';e.dispatchEvent(new Event('input',{bubbles:true}))});check('timeline scrubs frames',(await p.locator('#time').textContent()).startsWith('30'));

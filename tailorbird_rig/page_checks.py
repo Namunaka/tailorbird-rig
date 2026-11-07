@@ -3,6 +3,7 @@ import hashlib, json
 from collections import defaultdict
 from datetime import datetime, timezone
 from functools import lru_cache
+from .config import confined, covered_image
 from .store import atomic, read
 
 FINGERPRINT_FIELDS=('content_sha256','feedback_sha256')
@@ -16,22 +17,31 @@ def _batch_digest(revision,page,checks):
 def _digest(path, modified, size):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
-def image_digest(project, revision, page, device):
-    path=project.image(revision,page,device); stat=path.stat()
+def _file_digest(path):
+    stat=path.stat()
     return _digest(path,stat.st_mtime_ns,stat.st_size)
 
+class _RevisionContent:
+    def __init__(self,project,revision):
+        from .components import load
+        self.root,self.manifest=project.revision(revision)
+        elements=load(project,revision)
+        self.elements_digest=None if elements['example'] else elements['sha256']
+        self.animations={}
+
+    def digest(self,page,device):
+        parts=[_file_digest(covered_image(self.root,self.manifest,page,device))]
+        if self.elements_digest is not None:parts.append(self.elements_digest)
+        for animation in self.manifest.get('animations',[]):
+            if animation.get('pages') and page not in animation['pages']:continue
+            path=animation['path']
+            if path not in self.animations:
+                self.animations[path]=_file_digest(confined(self.root,path))
+            parts.append(self.animations[path])
+        return hashlib.sha256(json.dumps(parts).encode()).hexdigest()
+
 def content_digest(project, revision, page, device):
-    root,manifest=project.revision(revision)
-    from .config import confined
-    parts=[image_digest(project,revision,page,device)]
-    from .components import load
-    elements=load(project,revision)
-    if not elements['example']:parts.append(elements['sha256'])
-    for animation in manifest.get('animations',[]):
-        if animation.get('pages') and page not in animation['pages']:continue
-        path=confined(root,animation['path']);stat=path.stat()
-        parts.append(_digest(path,stat.st_mtime_ns,stat.st_size))
-    return hashlib.sha256(json.dumps(parts).encode()).hexdigest()
+    return _RevisionContent(project,revision).digest(page,device)
 
 def feedback_digest(issues):
     fields=('number','user_quote','attachments','status','work','resolved_content_sha256')
@@ -60,11 +70,14 @@ class _Review:
         self.records=_group(r for r in read(store.root/'page-checks.json',{'records':[]})['records']
                             if r['revision'] in self.visible)
         self.digests={}
+        self.content_by_revision={}
 
     def digest(self,revision,page,device):
         key=revision,page,device
         if key not in self.digests:
-            self.digests[key]=content_digest(self.project,revision,page,device)
+            if revision not in self.content_by_revision:
+                self.content_by_revision[revision]=_RevisionContent(self.project,revision)
+            self.digests[key]=self.content_by_revision[revision].digest(page,device)
         return self.digests[key]
 
     def status(self,page,device,detail=False):
@@ -151,7 +164,6 @@ def confirm(store,event):
         desired=event.get('confirmed',True)
         if not isinstance(desired,bool):raise ValueError('Invalid confirmation state')
         if 'batch_sha256' in event:
-            if not desired:raise ValueError('Batch confirmation cannot be revoked')
             checks={ident:review.status(page,ident,detail=True) for ident in devices}
             if event['batch_sha256']!=_batch_digest(revision,page,checks):
                 raise ValueError('Page or feedback changed; review again')

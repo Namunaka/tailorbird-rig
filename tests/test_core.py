@@ -98,6 +98,12 @@ class CoreTests(unittest.TestCase):
   result=confirm(self.store,dict(event,batch_sha256=current()['batch_sha256']))
   self.assertEqual(result['progress']['welcome']['confirmed'],total)
   self.assertEqual(result['overall']['confirmed'],total)
+  other=current()['pages']['done']
+  confirm(self.store,dict(event,page='done',**other))
+  result=confirm(self.store,dict(event,batch_sha256=current()['batch_sha256'],confirmed=False))
+  self.assertEqual(result['progress']['welcome']['confirmed'],0)
+  self.assertEqual(result['device_statuses']['welcome']['phone-b'],'needs_work')
+  self.assertEqual(result['progress']['done']['confirmed'],1)
  def test_withdrawing_inherited_confirmation_keeps_history(self):
   from tailorbird_rig.page_checks import snapshot,confirm
   def set_checked(revision,desired):

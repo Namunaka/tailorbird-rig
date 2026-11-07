@@ -19,6 +19,12 @@ def confined(root, relative):
         raise ConfigError('Path escapes configured root')
     return target
 
+def covered_image(root, manifest, page, device):
+    if page not in manifest['states'] or device not in [d['id'] for d in manifest['devices']]:
+        raise ConfigError('Unknown page or device')
+    template = manifest.get('image_template','screens/{device}/{state}.png')
+    return confined(root, template.format(device=device,state=page))
+
 class Project:
     def __init__(self, filename):
         self.filename = Path(filename).resolve()
@@ -61,10 +67,7 @@ class Project:
 
     def image(self, revision, page, device):
         root, manifest = self.revision(revision)
-        if page not in manifest['states'] or device not in [d['id'] for d in manifest['devices']]:
-            raise ConfigError('Unknown page or device')
-        template = manifest.get('image_template','screens/{device}/{state}.png')
-        return confined(root, template.format(device=device,state=page))
+        return covered_image(root, manifest, page, device)
 
     def is_closed(self, status):
         prefixes=self.raw.get('closed_status_prefixes',['已完成','已撤回','已验收','已合并处理','已解决','已关闭'])

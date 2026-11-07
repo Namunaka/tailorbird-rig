@@ -6,7 +6,7 @@ import subprocess
 import threading
 from uuid import UUID
 
-from .workflow import handoff
+from .workflow import SCOPE_GUIDANCE, handoff
 
 
 class WorkError(ValueError):
@@ -57,11 +57,12 @@ class CodexWork:
                 raise WorkError('没有待处理问题。请先保存批注评论。')
             numbers = '、'.join(str(issue['number']) for issue in bundle['issues'])
             prompt = (
-                f'用户在 Tailorbird Rig 点击了「开始任务」。请继续这份设计稿的评审修改。\n'
+                '用户通过 Tailorbird Rig 交接了待处理问题。请继续这份设计稿的评审修改。\n'
                 f'项目配置：{project.filename}\n'
                 f'当前版本：{revision}\n'
                 f'待处理问题编号：{numbers}\n'
-                '请用项目的 feedback 命令重新读取这些待处理问题，查看原稿、批注和附图，按原编号修改。'
+                '请用项目的 feedback 命令重新读取这些待处理问题，查看原稿、批注和附图，按原编号修改。\n'
+                f'{SCOPE_GUIDANCE}\n'
                 '按项目的评审约定发布新修订、回写已解决问题，保留历史版本与批注。'
                 '确认通过由用户操作。'
             )

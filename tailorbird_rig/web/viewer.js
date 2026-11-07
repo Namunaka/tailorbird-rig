@@ -25,44 +25,6 @@ var C,state,device,draw,resolveState,RIG;
    handoffLabel.textContent='已复制问题清单';setTimeout(()=>handoffLabel.textContent='复制待处理问题',2000);
   }catch(e){$('#error').textContent='无法复制，请使用工具栏的「下载问题交接」。'}
  };
- const startWork=$('#start-work'), workStatus=$('#codex-work-status');
- let workSource=null;
- function showWork(data){
-  workSource=data.source;
-  const active=['starting','running'].includes(data.state);
-  startWork.disabled=!workSource||active||RIG.revision!==RIG.currentRevision;
-  startWork.title=workSource?'来源对话：'+workSource:'项目尚未绑定来源对话';
-  const labels={starting:'正在启动 Codex…',running:'Codex 正在处理',completed:'Codex 本轮已结束，请检查问题处理记录',failed:'Codex 执行未完成，可在来源对话检查后重试'};
-  workStatus.textContent=workSource?[workSource,labels[data.state]].filter(Boolean).join(' · '):'尚未绑定来源对话';
-  if(active)setTimeout(refreshWork,1500);
- }
- async function refreshWork(){
-  try{
-   const response=await fetch('/api/codex-work');
-   const data=await response.json();
-   if(!response.ok)throw Error(data.error);
-   showWork(data);
-  }catch(error){workStatus.textContent=error.message||'无法读取来源对话';}
- }
- startWork.onclick=async()=>{
-  if(window.rigCanRefresh&&!rigCanRefresh()){
-   workStatus.textContent='请先保存当前评论或完成绘制，再开始工作。';
-   return;
-  }
-  startWork.disabled=true;
-  workStatus.textContent='正在提交待处理问题…';
-  try{
-   const response=await fetch('/api/codex-work',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({revision:RIG.revision})});
-   const data=await response.json();
-   if(!response.ok)throw Error(data.error);
-   showWork(data);
-  }catch(error){
-   workStatus.textContent=error.message||'暂时无法启动 Codex';
-   startWork.disabled=!workSource;
-  }
- };
- refreshWork();
  if(params.has('revision'))$('#component-library-link').href='/components.html?revision='+encodeURIComponent(RIG.revision);
  draw=function(){
   $('#states').replaceChildren();$('#devices').replaceChildren();
