@@ -38,19 +38,13 @@ The starter contains 3 page states, 7 size/form presets, 21 synthetic images, an
 4. The agent addresses issues by their original numbers, records results and evidence, creates a separate design revision, and publishes it.
 5. The view following the latest revision updates in the same tab. Continue reviewing there.
 
-The tools include pen, rectangle, location comments, color, stroke width, undo, and deletion. Browsing is the default: click existing annotations to select them and drag to move them. Drawing ends automatically after a stroke; clicking the active tool again or pressing Esc also exits drawing. There are no separate Browse or Select/Move buttons.
+The tools include pen, rectangle, arrow, location comments, color, stroke width, undo, and deletion. Browsing is the default: click existing annotations to select them and drag to move them. Drawing ends automatically after a stroke; clicking the active tool again or pressing Esc also exits drawing. There are no separate Browse or Select/Move buttons.
 
 The entire central area, including margins around the image, can be annotated. Delete edits text while an input is focused. Images can be uploaded, pasted, or dropped into the comment area.
 
 Feedback is scoped by **page × device/size × revision**. Records preserve the source image SHA256, comment edits, geometry history, withdrawals, and stable issue numbers. New feedback on a completed issue reopens the same number. Saving a comment records feedback; an agent starts the actual design work when instructed in a conversation.
 
-The **page navigation button background** shows review progress:
-
-- Default: not confirmed.
-- Yellow: the page's feedback has been addressed and needs human review.
-- Green: the user clicked **Confirm review** in the right panel.
-
-Pages without comments can also be confirmed. State is device-specific and survives reloads. Confirmation carries across revisions with unchanged content. Changed designs, linked animations, or new feedback invalidate it. Selected yellow/green pages use an outline so their state colors remain visible.
+Each page button shows its confirmed-device percentage, with green filling from left to right. A mark on any device needing review turns the page button yellow, even without a comment. Confirmations for other devices still count. **Confirm review** applies only to the current page and device. The overall progress above the page list reaches 100% only when every page–device pair is confirmed. Confirmations survive reloads; changed content or linked animations invalidate affected confirmations.
 
 ## Creating interfaces and continuing in a new chat
 

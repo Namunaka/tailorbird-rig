@@ -59,12 +59,48 @@ class CoreTests(unittest.TestCase):
   def status():return snapshot(self.store,'v1','phone-a')['pages']['welcome']
   stale=status();self.store.apply(self.add());self.store.apply(self.event('comment',text='调整标题'))
   with self.assertRaises(ValueError):confirm(self.store,dict(revision='v1',page='welcome',device='phone-a',**{k:stale[k] for k in ('content_sha256','feedback_sha256')}))
-  self.assertEqual(status()['status'],'default')
+  self.assertEqual(status()['status'],'needs_check')
   update_issue(self.config,1,'已完成（设计）','标题已调整','synthetic fixture')
   self.assertEqual(status()['status'],'needs_check')
   confirm(self.store,dict(revision='v1',page='welcome',device='phone-a',**{k:status()[k] for k in ('content_sha256','feedback_sha256')}))
   self.assertEqual(status()['status'],'confirmed')
-  self.store.apply(self.event('comment',text='再调整字号'));self.assertEqual(status()['status'],'default')
+  self.store.apply(self.event('comment',text='再调整字号'));self.assertEqual(status()['status'],'needs_check')
+ def test_progress_counts_every_page_device_and_bare_mark(self):
+  from tailorbird_rig.page_checks import snapshot,confirm
+  _,manifest=Project(self.config).revision('v1')
+  total=len(manifest['states'])*len(manifest['devices'])
+  for page in manifest['states']:
+   for device in manifest['devices']:
+    ident=device['id']
+    check=snapshot(self.store,'v1',ident)['pages'][page]
+    confirm(self.store,dict(revision='v1',page=page,device=ident,**check))
+  progress=snapshot(self.store,'v1','phone-b')
+  self.assertEqual(progress['overall'],dict(confirmed=total,total=total,needs_check=False))
+  self.store.apply(self.add())
+  progress=snapshot(self.store,'v1','phone-b')
+  self.assertEqual(progress['pages']['welcome']['status'],'confirmed')
+  self.assertEqual(progress['progress']['welcome'],dict(confirmed=6,total=7,needs_check=True))
+  self.assertEqual(progress['overall'],dict(confirmed=total-1,total=total,needs_check=True))
+  check=snapshot(self.store,'v1','phone-a')['pages']['welcome']
+  confirm(self.store,dict(revision='v1',page='welcome',device='phone-a',**check))
+  self.assertEqual(snapshot(self.store,'v1','phone-b')['overall']['confirmed'],total)
+ def test_withdrawing_inherited_confirmation_keeps_history(self):
+  from tailorbird_rig.page_checks import snapshot,confirm
+  def set_checked(revision,desired):
+   check=snapshot(self.store,revision,'phone-a')['pages']['welcome']
+   return confirm(self.store,dict(revision=revision,page='welcome',device='phone-a',confirmed=desired,**check))
+  set_checked('v1',True)
+  for revision in ('v2','v3'):
+   directory=self.root/'designs'/revision;shutil.copytree(self.root/'designs/v1',directory)
+   activate(self.config,revision,directory)
+   if revision=='v2':
+    self.assertEqual(snapshot(self.store,'v2','phone-b')['device_statuses']['welcome']['phone-a'],'confirmed')
+    withdrawn=set_checked('v2',False)
+    self.assertEqual(withdrawn['device_statuses']['welcome']['phone-a'],'default')
+    self.assertEqual(withdrawn['overall']['confirmed'],0)
+  self.assertEqual(snapshot(self.store,'v3','phone-a')['pages']['welcome']['status'],'default')
+  self.assertEqual(snapshot(self.store,'v1','phone-a')['pages']['welcome']['status'],'confirmed')
+  self.assertEqual(set_checked('v3',True)['overall']['confirmed'],1)
  def test_multiple_store_instances_serialize_issue_numbers(self):
   def write(n):
    store=ReviewStore(self.config);store.apply(self.add(str(n)));store.apply(self.event('comment',str(n),text=str(n)))

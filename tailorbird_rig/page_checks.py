@@ -1,5 +1,6 @@
 """Human page acceptance, tied to content and feedback rather than release names."""
 import hashlib, json
+from collections import defaultdict
 from datetime import datetime, timezone
 from functools import lru_cache
 from .store import atomic, read
@@ -29,39 +30,111 @@ def feedback_digest(issues):
     fields=('number','user_quote','attachments','status','work','resolved_content_sha256')
     return hashlib.sha256(json.dumps([{k:i.get(k) for k in fields} for i in sorted(issues,key=lambda i:i['number'])],sort_keys=True,ensure_ascii=False).encode()).hexdigest()
 
-def _context(store,revision,page,device):
-    project=store.project; content=content_digest(project,revision,page,device)
-    issues=[i for i in read(store.root/'issues.json',{})['issues'] if i.get('page')==page and i.get('device')==device and not i.get('status','').startswith('已撤回')]
-    return project,content,issues,feedback_digest(issues)
+def _group(entries):
+    groups=defaultdict(list)
+    for entry in entries:
+        groups[entry.get('page'),entry.get('device')].append(entry)
+    return groups
 
-def _status(store,revision,page,device,records):
-    project,content,issues,feedback=_context(store,revision,page,device)
-    revisions=list(project.revisions);index=revisions.index(revision)
-    for record in reversed(records):
-        if record['page']!=page or record['device']!=device or record['revision'] not in revisions:continue
-        start=revisions.index(record['revision'])
-        if start>index or record['content_sha256']!=content or record['feedback_sha256']!=feedback:continue
-        # A content change invalidates acceptance even if a later draft reuses old pixels.
-        try: unchanged=all(content_digest(project,r,page,device)==content for r in revisions[start:index+1])
-        except (ValueError,KeyError,FileNotFoundError): unchanged=False
-        if unchanged:
-            return {'status':'confirmed','content_sha256':content,'feedback_sha256':feedback,'confirmed_at':record['at']}
-    ready=bool(issues) and all(project.is_closed(i.get('status','')) for i in issues) and any(i.get('resolved_content_sha256')==content for i in issues)
-    return {'status':'needs_check' if ready else 'default','content_sha256':content,'feedback_sha256':feedback}
+
+class _Review:
+    def __init__(self,store,revision):
+        self.project=store.project
+        _,self.manifest=self.project.revision(revision)
+        self.revision=revision
+        self.revisions=list(self.project.revisions)
+        self.index=self.revisions.index(revision)
+        self.visible=set(self.revisions[:self.index+1])
+        self.issues=_group(i for i in read(store.root/'issues.json',{})['issues']
+                           if (not i.get('revision') or i['revision'] in self.visible)
+                           and not i.get('status','').startswith('已撤回'))
+        self.marks=_group(m for m in read(store.root/'annotations.json',{})['marks']
+                          if not m.get('deleted') and m.get('revision') in self.visible)
+        self.records=_group(r for r in read(store.root/'page-checks.json',{'records':[]})['records']
+                            if r['revision'] in self.visible)
+        self.digests={}
+
+    def digest(self,revision,page,device):
+        key=revision,page,device
+        if key not in self.digests:
+            self.digests[key]=content_digest(self.project,revision,page,device)
+        return self.digests[key]
+
+    def status(self,page,device,detail=False):
+        key=page,device
+        issues=self.issues.get(key,[])
+        marks=self.marks.get(key,[])
+        records=self.records.get(key,[])
+        if not (detail or issues or marks or records):
+            return {'status':'default'}
+        content=self.digest(self.revision,*key)
+
+        def same_draft(revision):
+            try:
+                return all(self.digest(r,*key)==content
+                           for r in self.revisions[self.revisions.index(revision):self.index+1])
+            except (ValueError,KeyError,FileNotFoundError):
+                return False
+
+        marks=[m for m in marks if same_draft(m['revision'])]
+        legacy=feedback_digest(issues)
+        fingerprint=sorted((m['id'],m.get('updated_at') or m.get('created_at') or '') for m in marks)
+        feedback=hashlib.sha256(json.dumps([legacy,fingerprint]).encode()).hexdigest() if marks else legacy
+        result={'content_sha256':content,'feedback_sha256':feedback}
+        # A later revision takes precedence over actions taken on older drafts.
+        for record in reversed(sorted(records,key=lambda r:self.revisions.index(r['revision']))):
+            if record.get('revoked'):break
+            if record['content_sha256']!=content:continue
+            # Keep approvals from before mark tracking if no active mark has changed since.
+            matches=record['feedback_sha256']==feedback
+            if not record.get('tracks_marks') and record['feedback_sha256']==legacy:
+                matches=all(stamp and stamp<=record['at'] for _,stamp in fingerprint)
+            if matches and same_draft(record['revision']):
+                return dict(result,status='confirmed',confirmed_at=record['at'])
+
+        pending=any(not self.project.is_closed(i.get('status','')) or
+                    i.get('resolved_content_sha256')==content for i in issues)
+        return dict(result,status='needs_check' if marks or pending else 'default')
+
 
 def snapshot(store,revision,device):
     with store.lock:
-        store.recover();project=store.project;_,manifest=project.revision(revision)
-        if device not in [d['id'] for d in manifest['devices']]:raise ValueError('Unknown device')
-        records=read(store.root/'page-checks.json',{'records':[]})['records']
-        return {'revision':revision,'device':device,'pages':{p:_status(store,revision,p,device,records) for p in manifest['states']}}
+        store.recover()
+        review=_Review(store,revision)
+        devices=[d['id'] for d in review.manifest['devices']]
+        if device not in devices:raise ValueError('Unknown device')
+        pages={}
+        progress={}
+        device_statuses={}
+        for page in review.manifest['states']:
+            statuses={}
+            for ident in devices:
+                check=review.status(page,ident,detail=ident==device)
+                statuses[ident]=check['status']
+                if ident==device:pages[page]=check
+            device_statuses[page]=statuses
+            progress[page]={'confirmed':list(statuses.values()).count('confirmed'),
+                            'total':len(devices),'needs_check':'needs_check' in statuses.values()}
+        overall={'confirmed':sum(p['confirmed'] for p in progress.values()),
+                 'total':sum(p['total'] for p in progress.values()),
+                 'needs_check':any(p['needs_check'] for p in progress.values())}
+        return {'revision':revision,'device':device,'pages':pages,'progress':progress,
+                'device_statuses':device_statuses,'overall':overall}
+
 
 def confirm(store,event):
     with store.lock:
         store.recover();revision=event['revision'];page=event['page'];device=event['device']
-        project,content,issues,feedback=_context(store,revision,page,device)
-        if event.get('content_sha256')!=content or event.get('feedback_sha256')!=feedback:raise ValueError('Page or feedback changed; review again')
-        data=read(store.root/'page-checks.json',{'schema':1,'records':[]})
-        data['records'].append({'revision':revision,'page':page,'device':device,'content_sha256':content,'feedback_sha256':feedback,'at':datetime.now(timezone.utc).isoformat()})
-        atomic(store.root/'page-checks.json',data)
+        desired=event.get('confirmed',True)
+        if not isinstance(desired,bool):raise ValueError('Invalid confirmation state')
+        check=_Review(store,revision).status(page,device,detail=True)
+        if any(event.get(k)!=check[k] for k in ('content_sha256','feedback_sha256')):
+            raise ValueError('Page or feedback changed; review again')
+        if (check['status']=='confirmed')!=desired:
+            data=read(store.root/'page-checks.json',{'schema':1,'records':[]})
+            data['records'].append({'revision':revision,'page':page,'device':device,
+                                    'content_sha256':check['content_sha256'],'feedback_sha256':check['feedback_sha256'],
+                                    'tracks_marks':True,'revoked':not desired,
+                                    'at':datetime.now(timezone.utc).isoformat()})
+            atomic(store.root/'page-checks.json',data)
         return snapshot(store,revision,device)

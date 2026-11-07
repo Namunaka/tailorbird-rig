@@ -77,13 +77,13 @@ class ReviewStore:
     if mark is not None:return self.snapshot()
     source=event.get('mark',{});revision=short(source.get('revision'));page=short(source.get('page'));device=short(source.get('device'));kind=short(source.get('kind'))
     directory,coverage=self.project.revision(revision)
-    if page not in coverage['states'] or device not in [x['id'] for x in coverage['devices']] or kind not in ['pen','rect','pin','page']:raise ValueError('Unknown design context')
+    if page not in coverage['states'] or device not in [x['id'] for x in coverage['devices']] or kind not in ['pen','rect','arrow','pin','page']:raise ValueError('Unknown design context')
     points=source.get('points',[])
     if not isinstance(points,list) or not 1<=len(points)<=20000:raise ValueError('Invalid points')
     extended=source.get('coordinate_space')=='image-extended'
     if any(not isinstance(p,list) or len(p)!=2 for p in points):raise ValueError('Invalid points')
     points=[[coord(p[0],extended),coord(p[1],extended)] for p in points if isinstance(p,list) and len(p)==2]
-    if not points or kind=='rect' and len(points)!=2 or kind in ['pin','page'] and len(points)!=1:raise ValueError('Invalid geometry')
+    if not points or kind in ('rect','arrow') and len(points)!=2 or kind in ['pin','page'] and len(points)!=1:raise ValueError('Invalid geometry')
     color=source.get('color','#ff675f')
     if color not in ['#ff675f','#6cd8ff','#ffd37a']:raise ValueError('Invalid color')
     width=source.get('width',3)
