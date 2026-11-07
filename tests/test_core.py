@@ -84,6 +84,20 @@ class CoreTests(unittest.TestCase):
   check=snapshot(self.store,'v1','phone-a')['pages']['welcome']
   confirm(self.store,dict(revision='v1',page='welcome',device='phone-a',**check))
   self.assertEqual(snapshot(self.store,'v1','phone-b')['overall']['confirmed'],total)
+ def test_batch_confirmation_rejects_stale_device_without_partial_writes(self):
+  from tailorbird_rig.page_checks import snapshot,confirm
+  event=dict(revision='v1',page='welcome',device='phone-a')
+  def current():
+   return snapshot(self.store,'v1','phone-a','welcome')
+  before=current()
+  total=before['progress']['welcome']['total']
+  self.store.apply(self.add(device='phone-b'))
+  with self.assertRaisesRegex(ValueError,'changed'):
+   confirm(self.store,dict(event,batch_sha256=before['batch_sha256']))
+  self.assertEqual(current()['overall']['confirmed'],0)
+  result=confirm(self.store,dict(event,batch_sha256=current()['batch_sha256']))
+  self.assertEqual(result['progress']['welcome']['confirmed'],total)
+  self.assertEqual(result['overall']['confirmed'],total)
  def test_withdrawing_inherited_confirmation_keeps_history(self):
   from tailorbird_rig.page_checks import snapshot,confirm
   def set_checked(revision,desired):

@@ -5,6 +5,13 @@ from datetime import datetime, timezone
 from functools import lru_cache
 from .store import atomic, read
 
+FINGERPRINT_FIELDS=('content_sha256','feedback_sha256')
+
+def _batch_digest(revision,page,checks):
+    fingerprints=[(device,*(check[k] for k in FINGERPRINT_FIELDS))
+                  for device,check in sorted(checks.items())]
+    return hashlib.sha256(json.dumps([revision,page,fingerprints]).encode()).hexdigest()
+
 @lru_cache(maxsize=4096)
 def _digest(path, modified, size):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -101,21 +108,25 @@ class _Review:
         return dict(result,status='needs_check' if resolved else 'default')
 
 
-def snapshot(store,revision,device):
+def snapshot(store,revision,device,active_page=None):
     with store.lock:
         store.recover()
         review=_Review(store,revision)
         devices=[d['id'] for d in review.manifest['devices']]
         if device not in devices:raise ValueError('Unknown device')
+        if active_page is not None and active_page not in review.manifest['states']:
+            raise ValueError('Unknown page')
         pages={}
         progress={}
         device_statuses={}
+        checks={}
         for page in review.manifest['states']:
             statuses={}
             for ident in devices:
-                check=review.status(page,ident,detail=ident==device)
+                check=review.status(page,ident,detail=ident==device or page==active_page)
                 statuses[ident]=check['status']
                 if ident==device:pages[page]=check
+                if page==active_page:checks[ident]=check
             device_statuses[page]=statuses
             progress[page]={'confirmed':list(statuses.values()).count('confirmed'),
                             'total':len(devices),'needs_check':'needs_check' in statuses.values(),
@@ -125,22 +136,39 @@ def snapshot(store,revision,device):
                  'needs_check':any(p['needs_check'] for p in progress.values()),
                  'needs_work':any(p['needs_work'] for p in progress.values())}
         return {'revision':revision,'device':device,'pages':pages,'progress':progress,
-                'device_statuses':device_statuses,'overall':overall}
+                'device_statuses':device_statuses,'overall':overall,
+                'active_page':active_page,
+                'batch_sha256':_batch_digest(revision,active_page,checks) if active_page is not None else None}
 
 
 def confirm(store,event):
     with store.lock:
         store.recover();revision=event['revision'];page=event['page'];device=event['device']
+        review=_Review(store,revision)
+        devices={d['id'] for d in review.manifest['devices']}
+        if page not in review.manifest['states'] or device not in devices:
+            raise ValueError('Unknown page or device')
         desired=event.get('confirmed',True)
         if not isinstance(desired,bool):raise ValueError('Invalid confirmation state')
-        check=_Review(store,revision).status(page,device,detail=True)
-        if any(event.get(k)!=check[k] for k in ('content_sha256','feedback_sha256')):
-            raise ValueError('Page or feedback changed; review again')
-        if (check['status']=='confirmed')!=desired:
+        if 'batch_sha256' in event:
+            if not desired:raise ValueError('Batch confirmation cannot be revoked')
+            checks={ident:review.status(page,ident,detail=True) for ident in devices}
+            if event['batch_sha256']!=_batch_digest(revision,page,checks):
+                raise ValueError('Page or feedback changed; review again')
+        else:
+            check=review.status(page,device,detail=True)
+            if any(event.get(k)!=check[k] for k in FINGERPRINT_FIELDS):
+                raise ValueError('Page or feedback changed; review again')
+            checks={device:check}
+        records=[]
+        for ident,check in checks.items():
+            if (check['status']=='confirmed')!=desired:
+                records.append({'revision':revision,'page':page,'device':ident,
+                                'content_sha256':check['content_sha256'],'feedback_sha256':check['feedback_sha256'],
+                                'tracks_marks':True,'revoked':not desired,
+                                'at':datetime.now(timezone.utc).isoformat()})
+        if records:
             data=read(store.root/'page-checks.json',{'schema':1,'records':[]})
-            data['records'].append({'revision':revision,'page':page,'device':device,
-                                    'content_sha256':check['content_sha256'],'feedback_sha256':check['feedback_sha256'],
-                                    'tracks_marks':True,'revoked':not desired,
-                                    'at':datetime.now(timezone.utc).isoformat()})
+            data['records'].extend(records)
             atomic(store.root/'page-checks.json',data)
-        return snapshot(store,revision,device)
+        return snapshot(store,revision,device,page)

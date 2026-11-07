@@ -51,8 +51,8 @@ class Handler(BaseHTTPRequestHandler):
             if path=='/api/review': self.respond(200,store.snapshot(self.revision)); return
             if path=='/api/page-checks':
                 from .page_checks import snapshot
-                device=parse_qs(urlsplit(self.path).query)['device'][0]
-                self.respond(200,snapshot(store,self.revision or project.current,device));return
+                query=parse_qs(urlsplit(self.path).query)
+                self.respond(200,snapshot(store,self.revision or project.current,query['device'][0],query.get('page',[None])[0]));return
             if path=='/issues.json':
                 with store.lock: store.recover(); self.respond(200,read(store.root/'issues.json',{}))
                 return

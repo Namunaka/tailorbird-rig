@@ -5,8 +5,11 @@
 #states button.active[data-check=needs_check],#states button.active[data-check=confirmed]{outline:2px solid #c5defb;outline-offset:2px}
 #page-check-controls{border-block:1px solid #ffffff20;padding:12px 0;margin:10px 0}
 #page-check-controls h3{margin:0;font-size:14px}
-#page-check-confirm{width:100%;background:#247a4c;border-color:#62bf8a}
-#page-check-confirm:disabled{opacity:.55;cursor:default}
+.page-check-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.page-check-actions button{background:#203c59;border-color:#3b6084}
+.page-check-actions button:disabled{opacity:.55;cursor:default}
+.page-check-actions button:is([aria-pressed=true],[data-check=confirmed]){background:#247a4c;border-color:#62bf8a}
+#page-check-all[data-check=confirmed]{opacity:1}
 
 /* Keep the page progress visible while switching the currently displayed device. */
 #states button[data-check]{display:grid;grid-template-columns:3.4em minmax(0,1fr);gap:8px;align-items:baseline}
@@ -59,7 +62,6 @@
 
 #devices button[data-check=confirmed]{background:#26814f;border-color:#62bf8a;color:#fff}
 #devices button.active[data-check=confirmed]{outline:2px solid #c5defb;outline-offset:2px}
-#page-check-confirm[aria-pressed=false]{background:#203c59;border-color:#3b6084}
 
 #states button[data-check=needs_work],#devices button[data-check=needs_work]{background:#963d47;border-color:#d47781;color:#fff}
 #devices button[data-check=needs_check]{background:#f4c451;color:#251c05;border-color:#ffe29a}
