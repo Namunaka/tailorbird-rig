@@ -94,7 +94,7 @@ class Handler(BaseHTTPRequestHandler):
             path=urlsplit(self.path).path; size=int(self.headers.get('Content-Length','0')); store=self.server.store
             if path=='/api/codex-work':
                 if self.headers.get('Origin')!='http://'+self.headers['Host']:
-                    self.respond(403,{'error':'请在当前评审页点击「开始工作」。'});return
+                    self.respond(403,{'error':'请在当前评审页点击「开始任务」。'});return
                 if self.headers.get('Content-Type','').split(';')[0]!='application/json' or not 0<size<=1024:
                     raise WorkError('请求格式无效。')
                 payload=json.loads(self.rfile.read(size))

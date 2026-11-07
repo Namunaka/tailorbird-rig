@@ -57,7 +57,7 @@ class CodexWork:
                 raise WorkError('没有待处理问题。请先保存批注评论。')
             numbers = '、'.join(str(issue['number']) for issue in bundle['issues'])
             prompt = (
-                f'用户在 Tailorbird Rig 点击了「开始工作」。请继续这份设计稿的评审修改。\n'
+                f'用户在 Tailorbird Rig 点击了「开始任务」。请继续这份设计稿的评审修改。\n'
                 f'项目配置：{project.filename}\n'
                 f'当前版本：{revision}\n'
                 f'待处理问题编号：{numbers}\n'

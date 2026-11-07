@@ -15,6 +15,7 @@
   <symbol id="tool-download" viewBox="0 0 24 24"><path d="M12 4v10m-4-4 4 4 4-4M5 15v4h14v-4"/></symbol>
   <symbol id="tool-library" viewBox="0 0 24 24"><path d="M12 3 3 8l9 5 9-5-9-5Zm-9 9 9 5 9-5m-18 4 9 5 9-5"/></symbol>
   <symbol id="tool-motion" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/></symbol>
+  <symbol id="tool-start" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></symbol>
   <symbol id="tool-document" viewBox="0 0 24 24"><path d="M6 4h8l4 4v12H6zM14 4v4h4M9 12h6m-6 4h5"/></symbol>
  </svg>
  <header class="viewer-header">
@@ -27,7 +28,7 @@
    <div class="revision-row"><label for="revision">设计版本</label><select id="revision"></select></div>
   </div>
   <nav class="viewer-tools" aria-label="评审工具导航">
-   <section class="tool-group" aria-labelledby="tool-review-label">
+   <section class="tool-group tool-review" aria-labelledby="tool-review-label">
     <h2 id="tool-review-label">问题与批注</h2>
     <div class="tool-items">
      <a class="tool-link" href="/issues.html" title="全部问题与处理记录"><svg aria-hidden="true"><use href="#tool-issues"/></svg>问题记录</a>
@@ -36,19 +37,26 @@
      <a class="tool-link" href="/api/handoff?format=markdown" download="tailorbird-feedback.md" id="handoff-download"><svg aria-hidden="true"><use href="#tool-download"/></svg>下载问题交接</a>
     </div>
    </section>
-   <section class="tool-group" aria-labelledby="tool-design-label">
-    <h2 id="tool-design-label">设计工具</h2>
-    <div class="tool-items">
-     <a class="tool-link" href="/components.html" id="component-library-link"><svg aria-hidden="true"><use href="#tool-library"/></svg>公共元素集</a>
-     <a class="tool-link" href="/lottie.html" id="lottie-workbench-link"><svg aria-hidden="true"><use href="#tool-motion"/></svg>Lottie 动画工作台</a>
-     <button class="tool-link tool-primary" type="button" id="start-work" disabled><svg aria-hidden="true"><use href="#tool-motion"/></svg>开始工作</button>
-    </div>
+   <section class="tool-group tool-work" aria-label="Codex 任务">
+    <button class="tool-link" type="button" id="start-work" aria-describedby="codex-work-status" disabled>
+     <svg aria-hidden="true"><use href="#tool-start"/></svg>
+     <span>开始任务</span>
+    </button>
     <small id="codex-work-status" role="status"></small>
    </section>
-   <section class="tool-group tool-references" id="tool-project-links" aria-labelledby="tool-project-label" hidden>
-    <h2 id="tool-project-label">项目资料</h2>
-    <div class="tool-items" id="links"></div>
-   </section>
+   <div class="tool-group tool-resources">
+    <section aria-labelledby="tool-design-label">
+     <h2 id="tool-design-label">设计工具</h2>
+     <div class="tool-items">
+      <a class="tool-link" href="/components.html" id="component-library-link"><svg aria-hidden="true"><use href="#tool-library"/></svg>公共元素集</a>
+      <a class="tool-link" href="/lottie.html" id="lottie-workbench-link"><svg aria-hidden="true"><use href="#tool-motion"/></svg>Lottie 动画工作台</a>
+     </div>
+    </section>
+    <section class="tool-references" id="tool-project-links" aria-labelledby="tool-project-label" hidden>
+     <h2 id="tool-project-label">项目资料</h2>
+     <div class="tool-items" id="links"></div>
+    </section>
+   </div>
   </nav>
   <p id="error" role="alert"></p>
  </header>
