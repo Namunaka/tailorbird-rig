@@ -52,7 +52,8 @@ class Handler(BaseHTTPRequestHandler):
             if path=='/api/page-checks':
                 from .page_checks import snapshot
                 query=parse_qs(urlsplit(self.path).query)
-                self.respond(200,snapshot(store,self.revision or project.current,query['device'][0],query.get('page',[None])[0]));return
+                self.respond(200,snapshot(store,self.revision or project.current,query['device'][0],
+                                          query.get('page',[None])[0],query.get('scope')==['page']));return
             if path=='/issues.json':
                 with store.lock: store.recover(); self.respond(200,read(store.root/'issues.json',{}))
                 return

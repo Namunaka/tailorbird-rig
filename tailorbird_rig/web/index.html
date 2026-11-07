@@ -42,6 +42,7 @@
      <div class="tool-items">
       <a class="tool-link" href="/components.html" id="component-library-link"><svg aria-hidden="true"><use href="#tool-library"/></svg>公共元素集</a>
       <a class="tool-link" href="/lottie.html" id="lottie-workbench-link"><svg aria-hidden="true"><use href="#tool-motion"/></svg>Lottie 动画工作台</a>
+      <button class="tool-link" type="button" id="shortcut-settings" aria-haspopup="dialog" disabled>快捷键设置</button>
      </div>
     </section>
     <section class="tool-references" id="tool-project-links" aria-labelledby="tool-project-label" hidden>
@@ -50,12 +51,29 @@
     </section>
    </div>
   </nav>
+  <dialog id="shortcut-dialog" aria-labelledby="shortcut-title">
+   <form method="dialog">
+    <h2 id="shortcut-title">快捷键设置</h2>
+    <div class="shortcut-fields">
+     <label for="shortcut-single" id="shortcut-single-label">检查确认 · 当前机型</label>
+     <button type="button" id="shortcut-single" data-shortcut="single" aria-labelledby="shortcut-single-label shortcut-single" aria-describedby="shortcut-help" autofocus></button>
+     <label for="shortcut-all" id="shortcut-all-label">全部确认 · 当前页所有机型</label>
+     <button type="button" id="shortcut-all" data-shortcut="all" aria-labelledby="shortcut-all-label shortcut-all" aria-describedby="shortcut-help"></button>
+    </div>
+    <p id="shortcut-help" role="status">选中要修改的快捷键，按下包含 ⌘、Ctrl 或 Alt 的字母或数字组合。</p>
+    <div class="tool-items">
+     <button type="button" id="shortcut-reset">恢复默认</button>
+     <button type="submit" value="cancel">取消</button>
+     <button type="submit" value="save" class="tool-primary">保存</button>
+    </div>
+   </form>
+  </dialog>
   <p id="error" role="alert"></p>
  </header>
  <main>
-  <aside id="states"></aside>
+  <aside id="states" aria-label="设计页面" aria-keyshortcuts="ArrowUp ArrowDown"></aside>
   <article>
-   <div id="devices" aria-label="机型与形态"></div>
+   <div id="devices" role="group" aria-label="机型与形态" aria-keyshortcuts="ArrowLeft ArrowRight"></div>
    <h2 id="title"></h2>
    <small id="size"></small>
    <img id="image" alt="当前设计稿">

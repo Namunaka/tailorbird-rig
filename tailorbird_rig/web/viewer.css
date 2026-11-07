@@ -6,12 +6,18 @@
 #page-check-controls{border-block:1px solid #ffffff20;padding:12px 0;margin:10px 0}
 #page-check-controls h3{margin:0;font-size:14px}
 .page-check-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-.page-check-actions button{background:#203c59;border-color:#3b6084}
+.page-check-actions button{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:2px 8px;background:#203c59;border-color:#3b6084}
+.page-check-actions kbd{padding:0 4px;border:1px solid #ffffff30;border-radius:4px;color:#dce9f8;font:inherit;font-size:11px;white-space:nowrap}
 .page-check-actions button:disabled{opacity:.55;cursor:default}
 .page-check-actions button:is([aria-pressed=true],[data-check=confirmed]){background:#247a4c;border-color:#62bf8a}
 
 /* Keep the page progress visible while switching the currently displayed device. */
 #states button[data-check]{display:grid;grid-template-columns:3.4em minmax(0,1fr);gap:8px;align-items:baseline}
+.state-row{display:grid;grid-template-columns:minmax(0,1fr) 30px;gap:5px;min-height:52px;margin:5px 0}
+.state-row button[data-page]{min-width:0;margin:0;overflow-wrap:anywhere}
+.page-doc-links{display:grid;grid-template-rows:repeat(2,minmax(0,1fr));gap:3px}
+#states .page-doc-link{display:grid;place-items:center;border:1px solid #33455a;border-radius:6px;text-decoration:none;font-size:12px;color:#b8d7f9;background:#1b2531}
+#states .page-doc-link:hover{background:#253c54}
 #states button[data-check=partial]{background-image:linear-gradient(to right,#26814f var(--review-progress),transparent var(--review-progress));background-color:#232a33}
 #states button.active[data-check=partial]{outline:2px solid #c5defb;outline-offset:2px}
 .page-review-percent{font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
@@ -44,6 +50,12 @@
 .tool-references .tool-link{background:transparent;border-color:#303e50}
 .tool-references .tool-link:hover{background:#28364a;border-color:#47618a}
 .viewer-header #error:empty{display:none}
+#shortcut-dialog{width:min(400px,calc(100% - 24px));padding:20px;background:#181e26;color:#edf1f6;border:1px solid #3b5069;border-radius:12px}
+#shortcut-dialog::backdrop{background:#080b11b8}
+#shortcut-dialog h2{margin:0;font-size:18px}
+.shortcut-fields{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px 12px;margin-top:12px}
+.shortcut-fields button{min-width:70px;border-color:#3b6084;background:#203c59}
+#shortcut-dialog .tool-items{justify-content:flex-end;margin-top:14px}
 @media(max-width:650px){
  .viewer-header{padding:14px 12px}
  .viewer-heading{flex-direction:column;align-items:stretch;gap:10px;margin-bottom:12px}

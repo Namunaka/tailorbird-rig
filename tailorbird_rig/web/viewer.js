@@ -26,17 +26,49 @@ var C,state,device,draw,resolveState,RIG;
   }catch(e){$('#error').textContent='无法复制，请使用工具栏的「下载问题交接」。'}
  };
  if(params.has('revision'))$('#component-library-link').href='/components.html?revision='+encodeURIComponent(RIG.revision);
+ const docTypes={product:['产','产品文档'],test:['测','测试文档']};
+ function pageRow(page,button){
+  const row=document.createElement('div'),links=document.createElement('div');
+  row.className='state-row';links.className='page-doc-links';row.append(button,links);
+  for(const [type,[icon,label]] of Object.entries(docTypes)){
+   const link=document.createElement('a');link.className='page-doc-link';link.dataset.doc=type;
+   link.textContent=icon;link.title=label;link.setAttribute('aria-label',(C.labels[page]||page)+' · '+label);
+   const query=new URLSearchParams({revision:RIG.revision,page,device});
+   link.href='/assets/page-doc.html?'+query+'#'+type;link.target='_blank';link.rel='noopener';links.append(link);
+  }
+  return row;
+ }
  draw=function(){
   $('#states').replaceChildren();$('#devices').replaceChildren();
   const assigned=new Set(),groups=RIG.groups.map(g=>({...g,states:g.states.filter(s=>C.states.includes(s))}));
   for(const g of groups)for(const s of g.states)assigned.add(s);
   const remaining=C.states.filter(s=>!assigned.has(s));if(remaining.length)groups.push({label:'设计页面',states:remaining});
-  for(const g of groups){if(!g.states.length)continue;const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent=g.label;details.open=g.states.includes(state);details.append(summary);for(const s of g.states){const b=document.createElement('button');b.dataset.page=s;b.textContent=C.labels?.[s]||s;b.className=s===state?'active':'';b.onclick=()=>{if(window.rigCanRefresh&&!rigCanRefresh()){$('#error').textContent='请先保存当前评论再切换页面';return}state=s;draw()};details.append(b)}$('#states').append(details)}
-  for(const d of C.devices){const b=document.createElement('button');b.textContent=d.name||d.id;b.dataset.device=d.id;b.className=d.id===device?'active':'';b.setAttribute('aria-pressed',String(d.id===device));b.onclick=()=>{if(window.rigCanRefresh&&!rigCanRefresh()){$('#error').textContent='请先保存当前评论再切换机型';return}device=d.id;draw()};$('#devices').append(b)}
+  for(const g of groups){if(!g.states.length)continue;const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent=g.label;details.open=g.states.includes(state);details.append(summary);for(const s of g.states){const b=document.createElement('button');b.dataset.page=s;b.textContent=C.labels?.[s]||s;b.className=s===state?'active':'';b.onclick=()=>{$('#error').textContent='';state=s;draw()};details.append(pageRow(s,b))}$('#states').append(details)}
+  for(const d of C.devices){const b=document.createElement('button');b.textContent=d.name||d.id;b.dataset.device=d.id;b.className=d.id===device?'active':'';b.setAttribute('aria-pressed',String(d.id===device));b.onclick=()=>{$('#error').textContent='';device=d.id;draw()};$('#devices').append(b)}
   $('#title').textContent=C.labels?.[state]||state;const d=C.devices.find(d=>d.id===device);$('#size').textContent=d.physicalW?`${d.physicalW} × ${d.physicalH} px · ${d.name} · ${RIG.revision}`:`${d.w} × ${d.h} 设计画幅 · ${d.name} · ${RIG.revision}`;
   const rel=(C.image_template||'screens/{device}/{state}.png').replace('{device}',device).replace('{state}',state);
   const url='/revisions/'+encodeURIComponent(RIG.revision)+'/'+rel.split('/').map(encodeURIComponent).join('/');$('#image').src=url;$('#image').alt=(C.labels?.[state]||state)+' · '+d.name;$('#raw').href=url;history.replaceState(null,'',location.pathname+location.search+'#'+state+'@'+device);
  };
+ const arrows={ArrowUp:['#states [data-page]',-1],ArrowDown:['#states [data-page]',1],
+               ArrowLeft:['#devices [data-device]',-1],ArrowRight:['#devices [data-device]',1]};
+ document.addEventListener('keydown',e=>{
+  const step=arrows[e.key];
+  if(!step||e.defaultPrevented||e.isComposing||e.metaKey||e.ctrlKey||e.altKey||e.shiftKey||
+     document.querySelector('dialog[open]')||
+     e.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"])'))return;
+  e.preventDefault();
+  const [selector,direction]=step;
+  const items=[...document.querySelectorAll(selector)];
+  const current=items.findIndex(item=>item.classList.contains('active'));
+  const next=current<0?null:items[current+direction];
+  if(!next)return;
+  const keepFocus=e.target.closest?.('#states,#devices');
+  next.click();
+  if(next.isConnected)return;
+  const active=document.querySelector(selector+'.active');
+  if(keepFocus)active.focus({preventScroll:true});
+  active.scrollIntoView({block:'nearest',inline:'nearest'});
+ });
  draw();const script=document.createElement('script');script.src='/assets/review.js';script.onload=()=>{const checks=document.createElement('script');checks.src='/assets/page-checks.js';document.body.append(checks)};document.body.append(script);
  // Follow the latest revision in this tab; explicitly selected historical revisions remain pinned.
  setInterval(async()=>{if(params.has('revision'))return;try{const r=await fetch('/api/project',{cache:'no-store'});if(!r.ok)return;const next=await r.json();if(next.revision!==RIG.revision){if(window.rigCanRefresh&&!window.rigCanRefresh()){$('#error').textContent='新版本 '+next.revision+' 已就绪，请先保存当前评论；保存后本页会更新。';return}location.reload()}}catch{}},3000);

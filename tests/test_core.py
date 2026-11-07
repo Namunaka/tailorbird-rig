@@ -104,6 +104,20 @@ class CoreTests(unittest.TestCase):
   self.assertEqual(result['progress']['welcome']['confirmed'],0)
   self.assertEqual(result['device_statuses']['welcome']['phone-b'],'needs_work')
   self.assertEqual(result['progress']['done']['confirmed'],1)
+ def test_scoped_confirmation_does_not_compute_other_pages(self):
+  from unittest.mock import patch
+  from tailorbird_rig.page_checks import _Review, snapshot, confirm
+  original=_Review.status
+  def only_welcome(review,page,*args,**kwargs):
+   self.assertEqual(page,'welcome')
+   return original(review,page,*args,**kwargs)
+  with patch.object(_Review,'status',only_welcome):
+   result=snapshot(self.store,'v1','phone-a','welcome',page_only=True)
+   result=confirm(self.store,dict(revision='v1',page='welcome',device='phone-a',scope='page',
+                                batch_sha256=result['batch_sha256']))
+  self.assertEqual(list(result['progress']),['welcome'])
+  self.assertIsNone(result['overall'])
+  self.assertEqual(result['progress']['welcome']['confirmed'],7)
  def test_withdrawing_inherited_confirmation_keeps_history(self):
   from tailorbird_rig.page_checks import snapshot,confirm
   def set_checked(revision,desired):

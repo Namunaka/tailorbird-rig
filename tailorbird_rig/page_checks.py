@@ -13,13 +13,14 @@ def _batch_digest(revision,page,checks):
                   for device,check in sorted(checks.items())]
     return hashlib.sha256(json.dumps([revision,page,fingerprints]).encode()).hexdigest()
 
-@lru_cache(maxsize=4096)
-def _digest(path, modified, size):
+# Long review histories can revisit several thousand distinct images per snapshot.
+@lru_cache(maxsize=32768)
+def _digest(path, modified, changed, size):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 def _file_digest(path):
     stat=path.stat()
-    return _digest(path,stat.st_mtime_ns,stat.st_size)
+    return _digest(path,stat.st_mtime_ns,stat.st_ctime_ns,stat.st_size)
 
 class _RevisionContent:
     def __init__(self,project,revision):
@@ -92,7 +93,7 @@ class _Review:
         def same_draft(revision):
             try:
                 return all(self.digest(r,*key)==content
-                           for r in self.revisions[self.revisions.index(revision):self.index+1])
+                           for r in reversed(self.revisions[self.revisions.index(revision):self.index]))
             except (ValueError,KeyError,FileNotFoundError):
                 return False
 
@@ -121,37 +122,41 @@ class _Review:
         return dict(result,status='needs_check' if resolved else 'default')
 
 
-def snapshot(store,revision,device,active_page=None):
+def snapshot(store,revision,device,active_page=None,page_only=False):
     with store.lock:
         store.recover()
         review=_Review(store,revision)
-        devices=[d['id'] for d in review.manifest['devices']]
-        if device not in devices:raise ValueError('Unknown device')
-        if active_page is not None and active_page not in review.manifest['states']:
-            raise ValueError('Unknown page')
-        pages={}
-        progress={}
-        device_statuses={}
-        checks={}
-        for page in review.manifest['states']:
-            statuses={}
-            for ident in devices:
-                check=review.status(page,ident,detail=ident==device or page==active_page)
-                statuses[ident]=check['status']
-                if ident==device:pages[page]=check
-                if page==active_page:checks[ident]=check
-            device_statuses[page]=statuses
-            progress[page]={'confirmed':list(statuses.values()).count('confirmed'),
-                            'total':len(devices),'needs_check':'needs_check' in statuses.values(),
-                            'needs_work':'needs_work' in statuses.values()}
-        overall={'confirmed':sum(p['confirmed'] for p in progress.values()),
-                 'total':sum(p['total'] for p in progress.values()),
-                 'needs_check':any(p['needs_check'] for p in progress.values()),
-                 'needs_work':any(p['needs_work'] for p in progress.values())}
-        return {'revision':revision,'device':device,'pages':pages,'progress':progress,
-                'device_statuses':device_statuses,'overall':overall,
-                'active_page':active_page,
-                'batch_sha256':_batch_digest(revision,active_page,checks) if active_page is not None else None}
+    return _snapshot(review,device,active_page,page_only)
+
+
+def _snapshot(review,device,active_page,page_only):
+    devices=[d['id'] for d in review.manifest['devices']]
+    if device not in devices:raise ValueError('Unknown device')
+    if (page_only or active_page is not None) and active_page not in review.manifest['states']:
+        raise ValueError('Unknown page')
+    pages={}
+    progress={}
+    device_statuses={}
+    checks={}
+    for page in ([active_page] if page_only else review.manifest['states']):
+        statuses={}
+        for ident in devices:
+            check=review.status(page,ident,detail=ident==device or page==active_page)
+            statuses[ident]=check['status']
+            if ident==device:pages[page]=check
+            if page==active_page:checks[ident]=check
+        device_statuses[page]=statuses
+        progress[page]={'confirmed':list(statuses.values()).count('confirmed'),
+                        'total':len(devices),'needs_check':'needs_check' in statuses.values(),
+                        'needs_work':'needs_work' in statuses.values()}
+    overall=None if page_only else {'confirmed':sum(p['confirmed'] for p in progress.values()),
+             'total':sum(p['total'] for p in progress.values()),
+             'needs_check':any(p['needs_check'] for p in progress.values()),
+             'needs_work':any(p['needs_work'] for p in progress.values())}
+    return {'revision':review.revision,'device':device,'pages':pages,'progress':progress,
+            'device_statuses':device_statuses,'overall':overall,
+            'active_page':active_page,
+            'batch_sha256':_batch_digest(review.revision,active_page,checks) if active_page is not None else None}
 
 
 def confirm(store,event):
@@ -183,4 +188,8 @@ def confirm(store,event):
             data=read(store.root/'page-checks.json',{'schema':1,'records':[]})
             data['records'].extend(records)
             atomic(store.root/'page-checks.json',data)
-        return snapshot(store,revision,device,page)
+            for record in records:
+                review.records[page,record['device']].append(record)
+    if event.get('scope')=='page':
+        return _snapshot(review,device,page,page_only=True)
+    return snapshot(store,revision,device,page)
