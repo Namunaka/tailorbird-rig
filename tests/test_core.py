@@ -59,12 +59,12 @@ class CoreTests(unittest.TestCase):
   def status():return snapshot(self.store,'v1','phone-a')['pages']['welcome']
   stale=status();self.store.apply(self.add());self.store.apply(self.event('comment',text='调整标题'))
   with self.assertRaises(ValueError):confirm(self.store,dict(revision='v1',page='welcome',device='phone-a',**{k:stale[k] for k in ('content_sha256','feedback_sha256')}))
-  self.assertEqual(status()['status'],'needs_check')
+  self.assertEqual(status()['status'],'needs_work')
   update_issue(self.config,1,'已完成（设计）','标题已调整','synthetic fixture')
   self.assertEqual(status()['status'],'needs_check')
   confirm(self.store,dict(revision='v1',page='welcome',device='phone-a',**{k:status()[k] for k in ('content_sha256','feedback_sha256')}))
   self.assertEqual(status()['status'],'confirmed')
-  self.store.apply(self.event('comment',text='再调整字号'));self.assertEqual(status()['status'],'needs_check')
+  self.store.apply(self.event('comment',text='再调整字号'));self.assertEqual(status()['status'],'needs_work')
  def test_progress_counts_every_page_device_and_bare_mark(self):
   from tailorbird_rig.page_checks import snapshot,confirm
   _,manifest=Project(self.config).revision('v1')
@@ -75,12 +75,12 @@ class CoreTests(unittest.TestCase):
     check=snapshot(self.store,'v1',ident)['pages'][page]
     confirm(self.store,dict(revision='v1',page=page,device=ident,**check))
   progress=snapshot(self.store,'v1','phone-b')
-  self.assertEqual(progress['overall'],dict(confirmed=total,total=total,needs_check=False))
+  self.assertEqual(progress['overall'],dict(confirmed=total,total=total,needs_check=False,needs_work=False))
   self.store.apply(self.add())
   progress=snapshot(self.store,'v1','phone-b')
   self.assertEqual(progress['pages']['welcome']['status'],'confirmed')
-  self.assertEqual(progress['progress']['welcome'],dict(confirmed=6,total=7,needs_check=True))
-  self.assertEqual(progress['overall'],dict(confirmed=total-1,total=total,needs_check=True))
+  self.assertEqual(progress['progress']['welcome'],dict(confirmed=6,total=7,needs_check=False,needs_work=True))
+  self.assertEqual(progress['overall'],dict(confirmed=total-1,total=total,needs_check=False,needs_work=True))
   check=snapshot(self.store,'v1','phone-a')['pages']['welcome']
   confirm(self.store,dict(revision='v1',page='welcome',device='phone-a',**check))
   self.assertEqual(snapshot(self.store,'v1','phone-b')['overall']['confirmed'],total)

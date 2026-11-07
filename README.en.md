@@ -44,7 +44,7 @@ The entire central area, including margins around the image, can be annotated. D
 
 Feedback is scoped by **page × device/size × revision**. Records preserve the source image SHA256, comment edits, geometry history, withdrawals, and stable issue numbers. New feedback on a completed issue reopens the same number. Saving a comment records feedback; an agent starts the actual design work when instructed in a conversation.
 
-Each page button shows its confirmed-device percentage, with green filling from left to right. A mark on any device needing review turns the page button yellow, even without a comment. Confirmations for other devices still count. **Confirm review** applies only to the current page and device. The overall progress above the page list reaches 100% only when every page–device pair is confirmed. Confirmations survive reloads; changed content or linked animations invalidate affected confirmations.
+Each page button shows its confirmed-device percentage, with green filling from left to right. Red indicates marks awaiting changes, yellow indicates changes awaiting review, and green indicates acceptance. Confirmations for other devices still count. **Confirm review** applies only to the current page and device. The overall progress above the page list reaches 100% only when every page–device pair is confirmed. Confirmations survive reloads; changed content or linked animations invalidate affected confirmations.
 
 ## Creating interfaces and continuing in a new chat
 

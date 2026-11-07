@@ -3,7 +3,20 @@ const{chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright'),fs=require(
 const root=path.resolve(__dirname,'..'),temp=fs.mkdtempSync(path.join(os.tmpdir(),'tailorbird-browser-')),project=path.join(temp,'project'),checks=[];fs.cpSync(path.join(root,'tailorbird_rig/starter'),project,{recursive:true});const config=path.join(project,'rig.json'),python=process.env.PYTHON||'python3';let server,browser;
 const check=(name,pass)=>{checks.push({name,pass});if(!pass)throw Error(name)};
 (async()=>{
- server=cp.spawn(python,['-m','tailorbird_rig','serve',config,'--port','0'],{cwd:root,stdio:['ignore','pipe','ignore']});
+ const sourceId='00000000-0000-4000-8000-000000000001';
+ const workspace=JSON.parse(fs.readFileSync(config,'utf8'));
+ workspace.codex_source={thread_id:sourceId,title:'测试来源对话',cwd:'.'};
+ fs.writeFileSync(config,JSON.stringify(workspace));
+ const cli=path.join(temp,'codex');
+ fs.writeFileSync(cli,[
+  '#!/bin/sh',
+  'echo "$@" > "$RIG_TEST_CAPTURE/args"',
+  'cat > "$RIG_TEST_CAPTURE/prompt"',
+  "echo '{\"type\":\"turn.started\"}'",
+  "echo '{\"type\":\"turn.completed\"}'"
+ ].join('\n')+'\n',{mode:0o700});
+ server=cp.spawn(python,['-m','tailorbird_rig','serve',config,'--port','0'],{cwd:root,
+  env:{...process.env,PATH:temp+path.delimiter+process.env.PATH,RIG_TEST_CAPTURE:temp},stdio:['ignore','pipe','ignore']});
  const base=await new Promise((resolve,reject)=>{let out='';server.stdout.on('data',d=>{out+=d;let m=out.match(/http:\/\/127\.0\.0\.1:\d+/);if(m)resolve(m[0])});server.on('exit',c=>reject(Error('server exited '+c)));setTimeout(()=>reject(Error('server startup timeout')),10000).unref()});
  browser=await chromium.launch({headless:true,...(process.env.CHROME_EXECUTABLE?{executablePath:process.env.CHROME_EXECUTABLE}:{})});const context=await browser.newContext(),p=await context.newPage(),errors=[];p.on('pageerror',e=>errors.push(e.message));await p.setViewportSize({width:1600,height:1050});await p.goto(base);await p.getByText('已连接本机批注',{exact:true}).waitFor();await p.locator('#image').evaluate(i=>i.decode());
  check('seven fixed device/form options',await p.locator('#devices button').count()===7);
@@ -26,6 +39,11 @@ const check=(name,pass)=>{checks.push({name,pass});if(!pass)throw Error(name)};
  await p.evaluate(bytes=>{const data=new DataTransfer();data.items.add(new File([Uint8Array.from(atob(bytes),c=>c.charCodeAt(0))],'pasted.png',{type:'image/png'}));document.dispatchEvent(new ClipboardEvent('paste',{clipboardData:data,bubbles:true,cancelable:true}))},bytes);await p.waitForFunction(()=>document.querySelectorAll('#review-attachments img').length===1);await p.locator('#review-add-comment').click();await saved();check('paste uploads image and creates general comment',(await data()).marks.some(m=>m.device==='phone-b'&&m.kind==='page'&&m.comment.attachments.length===1));
  await p.getByRole('button',{name:'手机 C · 示例',exact:true}).click();await p.evaluate(bytes=>{const data=new DataTransfer();data.items.add(new File([Uint8Array.from(atob(bytes),c=>c.charCodeAt(0))],'dropped.png',{type:'image/png'}));document.querySelector('#review-panel').dispatchEvent(new DragEvent('drop',{dataTransfer:data,bubbles:true,cancelable:true}))},bytes);await p.waitForFunction(()=>document.querySelectorAll('#review-attachments img').length===1);await p.locator('#review-add-comment').click();await saved();check('drag/drop uploads image', (await data()).marks.some(m=>m.device==='phone-c'&&m.comment?.attachments.length===1));
  const bundle=await(await p.request.get(base+'/api/handoff')).json();check('handoff includes numbered feedback and attachment provenance',bundle.issues.length===3&&bundle.markdown.includes('SHA256')&&bundle.markdown.includes('images/'));
+ await p.locator('#start-work:not([disabled])').click();
+ await p.waitForFunction(()=>document.querySelector('#codex-work-status').textContent.includes('本轮已结束'));
+ check('start work resumes the bound session with pending issue IDs',
+  fs.readFileSync(path.join(temp,'args'),'utf8').includes('resume --skip-git-repo-check '+sourceId)&&
+  fs.readFileSync(path.join(temp,'prompt'),'utf8').includes('待处理问题编号：'+bundle.issues.map(i=>i.number).join('、')));
  // Publishing creates a new revision and refreshes this tab after unsaved work is saved.
  await p.locator('#review-text').fill('尚未保存的新意见');fs.cpSync(path.join(project,'designs/v1'),path.join(project,'designs/v2'),{recursive:true});cp.execFileSync(python,['-m','tailorbird_rig','publish',config,'--revision','v2','--root',path.join(project,'designs/v2')],{cwd:root});await p.waitForTimeout(3600);check('unsaved feedback blocks auto-refresh',await p.locator('#revision').inputValue()==='v1'&&(await p.locator('#error').textContent()).includes('新版本'));
  await p.locator('#review-add-comment').click();await saved();await p.waitForFunction(()=>document.querySelector('#revision')?.value==='v2',undefined,{timeout:12000});await p.getByText('已连接本机批注',{exact:true}).waitFor();check('new revision loads in the same tab',context.pages().length===1);check('new revision keeps page and device',p.url().endsWith('#welcome@phone-c'));check('old revision annotations not drawn on new images',await p.locator('.review-card').count()===0);
@@ -53,8 +71,8 @@ const check=(name,pass)=>{checks.push({name,pass});if(!pass)throw Error(name)};
  const event={operation:'add',operationId:crypto.randomUUID(),id:'check-fixture',mark:{revision:'v2',page:'done',device:'phone-c',kind:'page',points:[[.5,.5]]}};
  await p.request.post(base+'/api/annotations',{data:event});
  await p.getByRole('button',{name:'手机 B · 示例',exact:true}).click();
- await p.waitForFunction(()=>document.querySelector('#states [data-page="done"]').dataset.check==='needs_check');
- check('a bare mark on another device turns page yellow',await nav.evaluate(b=>getComputedStyle(b).backgroundColor)==='rgb(244, 196, 81)');
+ await p.waitForFunction(()=>document.querySelector('#states [data-page="done"]').dataset.check==='needs_work');
+ check('a bare mark on another device turns page red',await nav.evaluate(b=>getComputedStyle(b).backgroundColor)==='rgb(150, 61, 71)');
  await p.getByRole('button',{name:'手机 C · 示例',exact:true}).click();
  await p.request.post(base+'/api/annotations',{data:{operation:'comment',operationId:crypto.randomUUID(),id:event.id,text:'Review this page'}});
  await p.waitForFunction(()=>document.querySelector('#overall-review-progress progress').value===0);check('new feedback invalidates confirmation',true);

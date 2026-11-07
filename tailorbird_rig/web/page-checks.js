@@ -1,6 +1,6 @@
 (()=>{
  const panel=document.querySelector('#review-panel'),area=document.createElement('section');area.id='page-check-controls';
- area.innerHTML='<h3>界面检查</h3><p id="page-check-state" role="status">正在读取检查状态…</p><button id="page-check-confirm" disabled>检查确认</button><p>左侧按所有机型累计。任一机型有待检查的标记，页面会显示黄色。</p>';
+ area.innerHTML='<h3>界面检查</h3><p id="page-check-state" role="status">正在读取检查状态…</p><button id="page-check-confirm" disabled>检查确认</button><p>红色待修改 · 黄色待复查 · 绿色已通过。左侧按所有机型累计。</p>';
  panel.insertBefore(area,document.querySelector('#review-tools'));
  let pages={},progress={},deviceStatuses={},overall=null,loadedDevice='',request=0,confirming=false;
  const button=document.querySelector('#page-check-confirm'),note=document.querySelector('#page-check-state');
@@ -20,7 +20,7 @@
     summary.innerHTML='<div class="overall-review-label"><span>总确认进度</span><strong></strong></div><progress aria-label="总确认进度"></progress><small></small>';
     sidebar.prepend(summary);
    }
-   summary.dataset.check=overall.needs_check?'needs_check':'default';
+   summary.dataset.check=overall.needs_work?'needs_work':overall.needs_check?'needs_check':'default';
    summary.querySelector('strong').textContent=percent(overall)+'%';
    const bar=summary.querySelector('progress');bar.max=overall.total;bar.value=overall.confirmed;
    summary.querySelector('small').textContent=overall.confirmed+' / '+overall.total+' 个页面 × 机型';
@@ -29,9 +29,9 @@
    const check=progress[b.dataset.page];
    if(!check)continue;
    const value=percent(check);
-   b.dataset.check=check.needs_check?'needs_check':value===100?'confirmed':value>0?'partial':'default';
+   b.dataset.check=check.needs_work?'needs_work':check.needs_check?'needs_check':value===100?'confirmed':value>0?'partial':'default';
    b.style.setProperty('--review-progress',value+'%');
-   b.title=check.confirmed+' / '+check.total+' 个机型已确认'+(check.needs_check?' · 有机型待检查':'');
+   b.title=check.confirmed+' / '+check.total+' 个机型已确认'+(check.needs_work?' · 有机型待修改':check.needs_check?' · 有机型待复查':'');
    let count=b.querySelector('.page-review-percent');
    if(!count){
     count=document.createElement('span');count.className='page-review-percent';
@@ -43,10 +43,10 @@
   for(const b of document.querySelectorAll('#devices button[data-device]')){
    const status=deviceStatuses[state]?.[b.dataset.device];
    b.dataset.check=status||'default';
-   b.title=status==='confirmed'?'当前页面 · 已检查确认':status==='needs_check'?'当前页面 · 待检查':'当前页面 · 尚未确认';
+   b.title=status==='confirmed'?'当前页面 · 已检查确认':status==='needs_work'?'当前页面 · 待修改':status==='needs_check'?'当前页面 · 待复查':'当前页面 · 尚未确认';
   }
   const checked=current?.status==='confirmed';
-  note.textContent=checked?'当前界面已检查确认，再点一次可撤回':current?.status==='needs_check'?'当前机型有标记，请检查确认':'当前界面尚未确认';
+  note.textContent=checked?'当前界面已检查确认，再点一次可撤回':current?.status==='needs_work'?'当前机型有标记，待修改':current?.status==='needs_check'?'修改已完成，等待复查':'当前界面尚未确认';
   button.textContent=checked?'已检查确认':'检查确认';
   button.setAttribute('aria-pressed',String(checked));
   button.disabled=confirming||!current||!document.querySelector('#image').complete||!document.querySelector('#image').naturalWidth;

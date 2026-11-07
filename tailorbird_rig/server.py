@@ -6,6 +6,7 @@ import json, hashlib, io, mimetypes, fcntl
 from PIL import Image, UnidentifiedImageError
 from .config import Project, confined, identifier
 from .store import ReviewStore, read
+from .codex_work import CodexWork, WorkError
 WEB = Path(__file__).parent/'web'
 
 class Handler(BaseHTTPRequestHandler):
@@ -42,6 +43,8 @@ class Handler(BaseHTTPRequestHandler):
                 else:self.respond(200,data)
                 return
             if path=='/api/project': self.respond(200,project.public(self.revision)); return
+            if path=='/api/codex-work':
+                self.respond(200,self.server.codex_work.status(project));return
             if path=='/api/components':
                 from .components import load
                 self.respond(200,load(project,self.revision));return
@@ -81,6 +84,7 @@ class Handler(BaseHTTPRequestHandler):
             name,_,relative=path.lstrip('/').partition('/')
             if name in project.raw.get('mounts',{}):self.file(confined(project.base/project.raw['mounts'][name],relative));return
             self.respond(404,{'error':'Not found'})
+        except WorkError as exc:self.respond(400,{'error':str(exc)})
         except (ValueError,KeyError,TypeError,FileNotFoundError): self.respond(404,{'error':'Unknown project resource'})
         except Exception: self.respond(500,{'error':'Unable to read workspace'})
 
@@ -88,6 +92,13 @@ class Handler(BaseHTTPRequestHandler):
         if not self.trusted():self.respond(403,{'error':'Local requests only'});return
         try:
             path=urlsplit(self.path).path; size=int(self.headers.get('Content-Length','0')); store=self.server.store
+            if path=='/api/codex-work':
+                if self.headers.get('Origin')!='http://'+self.headers['Host']:
+                    self.respond(403,{'error':'请在当前评审页点击「开始工作」。'});return
+                if self.headers.get('Content-Type','').split(';')[0]!='application/json' or not 0<size<=1024:
+                    raise WorkError('请求格式无效。')
+                payload=json.loads(self.rfile.read(size))
+                self.respond(202,self.server.codex_work.start(store.project,payload.get('revision')));return
             if path=='/api/page-checks/confirm':
                 if self.headers.get('Content-Type','').split(';')[0]!='application/json' or not 0<size<=16000:raise ValueError('Expected bounded JSON')
                 from .page_checks import confirm
@@ -117,6 +128,7 @@ class Handler(BaseHTTPRequestHandler):
             revision=self.revision;payload=store.apply(json.loads(self.rfile.read(size)))
             payload['currentRevision']=revision or store.project.current
             self.respond(200,payload)
+        except WorkError as exc:self.respond(400,{'error':str(exc)})
         except (ValueError,KeyError,TypeError,AttributeError,FileNotFoundError,UnidentifiedImageError,Image.DecompressionBombError):self.respond(400,{'error':'批注内容、图片或设计版本无效，请刷新后重试'})
         except Exception:self.respond(500,{'error':'未保存，请重试'})
 
@@ -130,4 +142,5 @@ def make_server(config, port=18766):
     try: server=ThreadingHTTPServer(('127.0.0.1',port),Handler)
     except Exception: lock.close();raise
     server.config=Path(config).resolve();server.store=store;server.workspace_lock=lock
+    server.codex_work=CodexWork()
     return server

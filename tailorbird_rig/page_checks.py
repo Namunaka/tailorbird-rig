@@ -92,9 +92,13 @@ class _Review:
             if matches and same_draft(record['revision']):
                 return dict(result,status='confirmed',confirmed_at=record['at'])
 
-        pending=any(not self.project.is_closed(i.get('status','')) or
-                    i.get('resolved_content_sha256')==content for i in issues)
-        return dict(result,status='needs_check' if marks or pending else 'default')
+        linked_marks={i.get('annotation_id') for i in issues}
+        if any(not self.project.is_closed(i.get('status','')) for i in issues) or any(
+            m['id'] not in linked_marks for m in marks
+        ):
+            return dict(result,status='needs_work')
+        resolved=any(i.get('resolved_content_sha256')==content for i in issues)
+        return dict(result,status='needs_check' if resolved else 'default')
 
 
 def snapshot(store,revision,device):
@@ -114,10 +118,12 @@ def snapshot(store,revision,device):
                 if ident==device:pages[page]=check
             device_statuses[page]=statuses
             progress[page]={'confirmed':list(statuses.values()).count('confirmed'),
-                            'total':len(devices),'needs_check':'needs_check' in statuses.values()}
+                            'total':len(devices),'needs_check':'needs_check' in statuses.values(),
+                            'needs_work':'needs_work' in statuses.values()}
         overall={'confirmed':sum(p['confirmed'] for p in progress.values()),
                  'total':sum(p['total'] for p in progress.values()),
-                 'needs_check':any(p['needs_check'] for p in progress.values())}
+                 'needs_check':any(p['needs_check'] for p in progress.values()),
+                 'needs_work':any(p['needs_work'] for p in progress.values())}
         return {'revision':revision,'device':device,'pages':pages,'progress':progress,
                 'device_statuses':device_statuses,'overall':overall}
 

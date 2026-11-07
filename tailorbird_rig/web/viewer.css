@@ -57,3 +57,11 @@
 #devices button[data-check=confirmed]{background:#26814f;border-color:#62bf8a;color:#fff}
 #devices button.active[data-check=confirmed]{outline:2px solid #c5defb;outline-offset:2px}
 #page-check-confirm[aria-pressed=false]{background:#203c59;border-color:#3b6084}
+
+#states button[data-check=needs_work],#devices button[data-check=needs_work]{background:#963d47;border-color:#d47781;color:#fff}
+#devices button[data-check=needs_check]{background:#f4c451;color:#251c05;border-color:#ffe29a}
+#states button.active[data-check=needs_work],#devices button.active:is([data-check=needs_work],[data-check=needs_check]){outline:2px solid #c5defb;outline-offset:2px}
+#overall-review-progress[data-check=needs_work]{border-color:#d47781}
+#overall-review-progress[data-check=needs_work] progress{accent-color:#d47781}
+#codex-work-status{display:block;max-width:100%;margin:4px 2px 0;line-height:1.45;overflow-wrap:anywhere}
+#start-work:disabled{opacity:.55;cursor:default}
