@@ -63,6 +63,8 @@ class CodexWork:
                 f'待处理问题编号：{numbers}\n'
                 '请用项目的 feedback 命令重新读取这些待处理问题，查看原稿、批注和附图，按原编号修改。\n'
                 f'{SCOPE_GUIDANCE}\n'
+                f'{bundle["alpha_guidance"]}\n'
+                f'{bundle["alpha_check"]}\n'
                 '按项目的评审约定发布新修订、回写已解决问题，保留历史版本与批注。'
                 '确认通过由用户操作。'
             )

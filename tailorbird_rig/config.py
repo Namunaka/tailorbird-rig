@@ -25,6 +25,50 @@ def covered_image(root, manifest, page, device):
     template = manifest.get('image_template','screens/{device}/{state}.png')
     return confined(root, template.format(device=device,state=page))
 
+def validate_implementation_evidence(root, manifest, required=False):
+    path=confined(root,'implementation-evidence.json')
+    if not path.exists():
+        if required:
+            raise ConfigError('Alpha 开发验收未完成：缺少 implementation-evidence.json')
+        return
+    data=json.loads(path.read_text())
+    if not isinstance(data,dict) or not isinstance(data.get('pages'),dict):
+        raise ConfigError('Expected implementation evidence pages')
+    if required:
+        missing_pages=[page for page in manifest['states'] if page not in data['pages']]
+        if missing_pages:
+            raise ConfigError(f'Alpha 开发验收未完成：{len(missing_pages)} 个页面未登记，通过证据或范围例外待补：'
+                              +', '.join(missing_pages[:8]))
+    devices={device['id'] for device in manifest['devices']}
+    exclusions=data.get('exclusions',{})
+    if not isinstance(exclusions,dict) or exclusions.keys()-data['pages'].keys():
+        raise ConfigError('Alpha exclusions must reference a registered page')
+    for page,entries in data['pages'].items():
+        if page not in manifest['states'] or not isinstance(entries,dict):
+            raise ConfigError('Unknown implementation evidence page')
+        excluded=exclusions.get(page,{})
+        if not isinstance(excluded,dict) or excluded.keys()-devices or excluded.keys()&entries.keys():
+            raise ConfigError('Invalid Alpha exclusions: '+page)
+        for exception in excluded.values():
+            if (not isinstance(exception,dict) or exception.get('kind') not in {'not_implemented','out_of_scope'}
+                or not isinstance(exception.get('reason'),str) or not exception['reason'].strip()):
+                raise ConfigError('Alpha exclusions require a reason: '+page)
+        missing=devices-entries.keys()-excluded.keys()
+        if missing:
+            raise ConfigError('Missing Alpha simulator evidence for '+page+': '+', '.join(sorted(missing)))
+        for device,entry in entries.items():
+            if device not in devices or not isinstance(entry,dict):
+                raise ConfigError('Unknown implementation evidence device')
+            if entry.get('status')!='alpha' or entry.get('environment')!='simulator' or entry.get('result')!='passed':
+                raise ConfigError('Expected passing Alpha simulator evidence')
+            if any(not isinstance(entry.get(key),str) or not entry[key].strip() for key in ('build','summary')):
+                raise ConfigError('Alpha evidence requires a build and test summary')
+            screenshot=confined(root,entry.get('screenshot'))
+            if not screenshot.is_file() or screenshot.suffix.lower() not in {'.png','.jpg','.jpeg','.webp'}:
+                raise ConfigError('Missing or unsupported Alpha simulator screenshot')
+            if 'report' in entry and not confined(root,entry['report']).is_file():
+                raise ConfigError('Missing Alpha test report')
+
 class Project:
     def __init__(self, filename):
         self.filename = Path(filename).resolve()
@@ -73,10 +117,11 @@ class Project:
         prefixes=self.raw.get('closed_status_prefixes',['已完成','已撤回','已验收','已合并处理','已解决','已关闭'])
         return isinstance(status,str) and status.startswith(tuple(prefixes))
 
-    def validate_assets(self, revision=None):
+    def validate_assets(self, revision=None, require_alpha=False):
         ident=revision or self.current;root,manifest=self.revision(ident);count=0
         from .components import load
         load(self,ident)
+        validate_implementation_evidence(root,manifest,required=require_alpha)
         for device in manifest['devices']:
             for state in manifest['states']:
                 if not self.image(ident,state,device['id']).is_file():raise ConfigError('Missing image: '+device['id']+'/'+state)

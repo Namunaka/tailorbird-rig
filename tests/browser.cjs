@@ -5,6 +5,14 @@ const check=(name,pass)=>{checks.push({name,pass});if(!pass)throw Error(name)};
 (async()=>{
  const sourceId='00000000-0000-4000-8000-000000000001';
  const workspace=JSON.parse(fs.readFileSync(config,'utf8'));
+ const design=path.join(project,'designs/v1'),manifest=JSON.parse(fs.readFileSync(path.join(design,'coverage.json'),'utf8'));
+ fs.mkdirSync(path.join(design,'evidence'));
+ fs.copyFileSync(path.join(design,'screens/phone-a/form.png'),path.join(design,'evidence/simulator.png'));
+ fs.writeFileSync(path.join(design,'implementation-evidence.json'),JSON.stringify({
+  pages:{form:{'phone-a':{status:'alpha',environment:'simulator',result:'passed',build:'fixture.1',
+   screenshot:'evidence/simulator.png',summary:'表单提交流程已验证'}}},
+  exclusions:{form:Object.fromEntries(manifest.devices.filter(d=>d.id!=='phone-a').map(d=>[d.id,{kind:'out_of_scope',reason:'测试只覆盖 A'}]))}
+ }));
  fs.writeFileSync(path.join(project,'designs/v1/page-docs.json'),JSON.stringify({status:'测试夹具',pages:{form:{
   product:['说明表单功能'],sections:[{title:'实现范围',items:['保留表单输入']}],
   cases:[{title:'表单提交',setup:['填写表单'],steps:['检查表单提交'],expected:['提交成功']}]
@@ -24,6 +32,11 @@ const check=(name,pass)=>{checks.push({name,pass});if(!pass)throw Error(name)};
  const base=await new Promise((resolve,reject)=>{let out='';server.stdout.on('data',d=>{out+=d;let m=out.match(/http:\/\/127\.0\.0\.1:\d+/);if(m)resolve(m[0])});server.on('exit',c=>reject(Error('server exited '+c)));setTimeout(()=>reject(Error('server startup timeout')),10000).unref()});
  browser=await chromium.launch({headless:true,...(process.env.CHROME_EXECUTABLE?{executablePath:process.env.CHROME_EXECUTABLE}:{})});const context=await browser.newContext(),p=await context.newPage(),errors=[];p.on('pageerror',e=>errors.push(e.message));await p.setViewportSize({width:1600,height:1050});await p.goto(base);await p.getByText('已连接本机批注',{exact:true}).waitFor();await p.locator('#image').evaluate(i=>i.decode());
  check('seven fixed device/form options',await p.locator('#devices button').count()===7);
+ const development=p.locator('#development-test-progress');
+ await development.getByText('1 / 21 个页面 × 机型已通过 · 本期范围例外 6 个').waitFor();
+ await p.locator('#overall-review-progress + #development-test-progress').waitFor();
+ check('development progress sits below design progress and counts all devices in coverage',
+  await development.locator('strong').textContent()==='4.8%'&&await development.locator('progress').evaluate(bar=>bar.value===1&&bar.max===21));
  const formRow=p.locator('.state-row').filter({has:p.locator('[data-page="form"]')});
  const productLink=formRow.locator('[data-doc="product"]'),testLink=formRow.locator('[data-doc="test"]');
  const [rowBox,productBox,testBox]=await Promise.all([formRow.locator('[data-page]').boundingBox(),productLink.boundingBox(),testLink.boundingBox()]);
@@ -45,12 +58,36 @@ const check=(name,pass)=>{checks.push({name,pass});if(!pass)throw Error(name)};
  await p.locator('#states [data-page="welcome"]').focus();
  await p.keyboard.press('ArrowDown');
  check('Down selects the next page and keeps navigation focus',p.url().endsWith('#form@phone-a')&&await p.locator('#states [data-page="form"]').evaluate(b=>b===document.activeElement));
+ const alphaDevice=p.locator('#devices [data-device="phone-a"]');
+ await alphaDevice.locator('.device-alpha').waitFor();
+ check('Alpha badge is scoped to its device and separate from review confirmation',await p.locator('.device-alpha').count()===1&&await alphaDevice.getAttribute('data-check')!=='confirmed');
+ await alphaDevice.hover();
+ const simulatorReport=p.locator('#device-report-phone-a');
+ await simulatorReport.getByText('表单提交流程已验证').waitFor();
+ await simulatorReport.locator('img').evaluate(img=>img.decode());
+ check('device hover shows screenshot and simulator result',await simulatorReport.getByText('测试通过 · 构建 fixture.1').isVisible());
+ await p.locator('#states [data-page="form"]').hover();
+ await alphaDevice.focus();
+ check('keyboard focus also opens simulator report',await simulatorReport.isVisible());
+ await p.keyboard.press('Escape');
+ await simulatorReport.waitFor({state:'hidden'});
+ await p.locator('#page-check-all').click();
+ const confirmedForm=formRow.locator('[data-page="form"][data-check="confirmed"]');
+ await confirmedForm.waitFor();
+ check('confirmed row with one tested device and six exceptions shows only partial dark green',
+  await confirmedForm.evaluate(button=>button.querySelector('.page-review-percent').textContent==='100%'&&
+    button.querySelector('.page-development-percent').textContent==='测试 14.3%'&&
+    getComputedStyle(button).backgroundImage.includes('rgb(16, 75, 52) 14.3%')));
+ await p.getByRole('button',{name:'全部取消',exact:true}).click();
+ await formRow.locator('[data-page="form"][data-check="default"]').waitFor();
  await p.keyboard.press('ArrowRight');
  check('Right selects the next device and keeps the page',p.url().endsWith('#form@phone-b'));
  await p.keyboard.press('ArrowLeft');
  await p.keyboard.press('ArrowUp');
  await p.keyboard.press('ArrowUp');
  check('Left and Up select the previous item and stop at the boundary',p.url().endsWith('#welcome@phone-a'));
+ check('another page has no Alpha without matching evidence',await p.locator('.device-alpha').count()===0);
+ check('development progress covers the whole revision when switching pages',await development.locator('strong').textContent()==='4.8%');
  await p.locator('#review-text').fill('未保存的导航测试');
  await p.keyboard.press('ArrowDown');
  check('arrow keys stay in the comment field while editing',p.url().endsWith('#welcome@phone-a'));
@@ -94,6 +131,7 @@ const check=(name,pass)=>{checks.push({name,pass});if(!pass)throw Error(name)};
  await p.getByRole('button',{name:'手机 C · 示例',exact:true}).click();await p.evaluate(bytes=>{const data=new DataTransfer();data.items.add(new File([Uint8Array.from(atob(bytes),c=>c.charCodeAt(0))],'dropped.png',{type:'image/png'}));document.querySelector('#review-panel').dispatchEvent(new DragEvent('drop',{dataTransfer:data,bubbles:true,cancelable:true}))},bytes);await p.waitForFunction(()=>document.querySelectorAll('#review-attachments img').length===1);await p.locator('#review-add-comment').click();await saved();check('drag/drop uploads image', (await data()).marks.some(m=>m.device==='phone-c'&&m.comment?.attachments.length===1));
  const bundle=await(await p.request.get(base+'/api/handoff')).json();check('handoff includes numbered feedback and attachment provenance',bundle.issues.length===3&&bundle.markdown.includes('SHA256')&&bundle.markdown.includes('images/'));
  check('handoff prompts cross-device and state review',bundle.scope_guidance.includes('各机型、折叠形态和相关状态')&&bundle.markdown.includes(bundle.scope_guidance));
+ check('handoff includes native verification and its completion gate',bundle.alpha_guidance.includes('implementation-evidence.json')&&bundle.alpha_check.includes('--require-alpha')&&bundle.markdown.includes(bundle.alpha_guidance)&&bundle.markdown.includes(bundle.alpha_check));
  check('review toolbar offers handoff without a start task card',await p.locator('#start-work').count()===0&&await p.locator('#handoff').isVisible());
  const work=await p.request.post(base+'/api/codex-work',{headers:{Origin:base},data:{revision:'v1'}});
  check('existing local work endpoint accepts the configured revision',work.status()===202);
@@ -107,7 +145,8 @@ const check=(name,pass)=>{checks.push({name,pass});if(!pass)throw Error(name)};
  check('local work endpoint resumes the bound session with pending issue IDs',
   fs.readFileSync(path.join(temp,'args'),'utf8').includes('resume --skip-git-repo-check '+sourceId)&&
   fs.readFileSync(path.join(temp,'prompt'),'utf8').includes('待处理问题编号：'+bundle.issues.map(i=>i.number).join('、'))&&
-  fs.readFileSync(path.join(temp,'prompt'),'utf8').includes(bundle.scope_guidance));
+  fs.readFileSync(path.join(temp,'prompt'),'utf8').includes(bundle.scope_guidance)&&
+  fs.readFileSync(path.join(temp,'prompt'),'utf8').includes(bundle.alpha_check));
  // Publishing creates a new revision and refreshes this tab after unsaved work is saved.
  await p.locator('#review-text').fill('尚未保存的新意见');fs.cpSync(path.join(project,'designs/v1'),path.join(project,'designs/v2'),{recursive:true});cp.execFileSync(python,['-m','tailorbird_rig','publish',config,'--revision','v2','--root',path.join(project,'designs/v2')],{cwd:root});await p.waitForTimeout(3600);check('unsaved feedback blocks auto-refresh',await p.locator('#revision').inputValue()==='v1'&&(await p.locator('#error').textContent()).includes('新版本'));
  await p.locator('#review-add-comment').click();await saved();await p.waitForFunction(()=>document.querySelector('#revision')?.value==='v2',undefined,{timeout:12000});await p.getByText('已连接本机批注',{exact:true}).waitFor();check('new revision loads in the same tab',context.pages().length===1);check('new revision keeps page and device',p.url().endsWith('#welcome@phone-c'));check('old revision annotations not drawn on new images',await p.locator('.review-card').count()===0);

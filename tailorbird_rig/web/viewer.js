@@ -29,6 +29,11 @@ var C,state,device,draw,resolveState,RIG;
  const docTypes={product:['产','产品文档'],test:['测','测试文档']};
  function pageRow(page,button){
   const row=document.createElement('div'),links=document.createElement('div');
+  const stats=document.createElement('span'),review=document.createElement('span'),test=document.createElement('span');
+  const label=document.createElement('span');label.textContent=button.textContent;
+  stats.className='page-row-progress';review.className='page-review-percent';test.className='page-development-percent';
+  test.hidden=true;stats.append(review,test);button.replaceChildren(stats,label);
+  showPageDevelopment(button);
   row.className='state-row';links.className='page-doc-links';row.append(button,links);
   for(const [type,[icon,label]] of Object.entries(docTypes)){
    const link=document.createElement('a');link.className='page-doc-link';link.dataset.doc=type;
@@ -38,13 +43,107 @@ var C,state,device,draw,resolveState,RIG;
   }
   return row;
  }
+ const revisionRoot='/revisions/'+encodeURIComponent(RIG.revision)+'/';
+ let implementation={};
+ const developmentByPage=new Map();
+ const developmentProgress=document.createElement('div');
+ developmentProgress.id='development-test-progress';
+ developmentProgress.innerHTML='<div class="overall-review-label"><span>开发测试进度</span><strong>—</strong></div><progress aria-label="开发测试进度" hidden></progress><small role="status">正在读取测试证据…</small>';
+ function evidenceUrl(path){
+  if(typeof path!=='string'||path.includes('\\'))return null;
+  const parts=path.split('/');
+  if(parts.some(part=>!part||part==='.'||part==='..'))return null;
+  return revisionRoot+parts.map(encodeURIComponent).join('/');
+ }
+ function alphaEvidence(page,id){
+  const entry=implementation[page]?.[id];
+  return entry?.status==='alpha'&&entry.environment==='simulator'&&entry.result==='passed'&&
+         evidenceUrl(entry.screenshot)&&typeof entry.summary==='string'&&entry.summary.trim()&&
+         typeof entry.build==='string'&&entry.build.trim()?entry:null;
+ }
+ function showDevelopmentProgress(exclusions){
+  let passed=0,excluded=0;
+  for(const page of C.states){
+   let pagePassed=0,pageExcluded=0;
+   for(const {id} of C.devices){
+    if(alphaEvidence(page,id)){pagePassed++;continue}
+    const exception=exclusions?.[page]?.[id];
+    if(['not_implemented','out_of_scope'].includes(exception?.kind)&&
+       typeof exception.reason==='string'&&exception.reason.trim())pageExcluded++;
+   }
+   developmentByPage.set(page,{passed:pagePassed,total:C.devices.length,excluded:pageExcluded});
+   passed+=pagePassed;excluded+=pageExcluded;
+  }
+  for(const button of $('#states').querySelectorAll('button[data-page]'))showPageDevelopment(button);
+  const total=C.states.length*C.devices.length;
+  const percent=developmentPercent(passed,total);
+  developmentProgress.querySelector('strong').textContent=total?percent+'%':'—';
+  const bar=developmentProgress.querySelector('progress');
+  bar.hidden=!total;
+  if(total){bar.max=total;bar.value=passed}
+  const label=passed+' / '+total+' 个页面 × 机型已通过';
+  developmentProgress.querySelector('small').textContent=label+(excluded?' · 本期范围例外 '+excluded+' 个':'');
+ }
+ function developmentPercent(passed,total){
+  if(!total)return 0;
+  return passed===total?100:Math.min(99.9,Math.round(1000*passed/total)/10);
+ }
+ function showPageDevelopment(button){
+  const progress=developmentByPage.get(button.dataset.page);
+  if(!progress)return;
+  const {passed,total,excluded}=progress,percent=developmentPercent(passed,total);
+  const label=button.querySelector('.page-development-percent');
+  label.hidden=false;label.textContent='测试 '+percent+'%';
+  label.title=passed+' / '+total+' 个机型已通过'+(excluded?' · 本期范围例外 '+excluded+' 个':'');
+  button.style.setProperty('--development-progress',percent+'%');
+ }
+ function decorateDevices(){
+  for(const control of $('#devices').querySelectorAll('button[data-device]')){
+   const entry=alphaEvidence(state,control.dataset.device);
+   if(!entry||control.closest('.device-evidence'))continue;
+   const screenshot=evidenceUrl(entry.screenshot);
+   const wrapper=document.createElement('div');wrapper.className='device-evidence';
+   const badge=document.createElement('span');badge.className='device-alpha';badge.textContent='Alpha';
+   badge.setAttribute('aria-hidden','true');control.append(badge);control.removeAttribute('title');
+   const report=document.createElement('div');report.className='device-report';
+   const title=document.createElement('strong');title.textContent='Alpha · 模拟器测试报告';
+   const summary=document.createElement('p');summary.textContent=entry.summary;
+   const build=document.createElement('small');build.textContent='测试通过 · 构建 '+entry.build;
+   const image=document.createElement('img');image.alt='模拟器截图';
+   const reportUrl=evidenceUrl(entry.report),link=document.createElement('a');link.href=reportUrl||screenshot;
+   link.target='_blank';link.rel='noopener';link.textContent=reportUrl?'打开完整报告 ↗':'查看原始截图 ↗';
+   report.append(title,build,image,summary,link);
+   report.id='device-report-'+control.dataset.device;
+   control.setAttribute('aria-describedby',report.id);
+   control.replaceWith(wrapper);wrapper.append(control,report);
+   function positionReport(){
+    delete wrapper.dataset.dismissed;
+    const rect=wrapper.getBoundingClientRect();
+    const width=Math.min(320,window.innerWidth-24);
+    const left=Math.max(12,Math.min(rect.left,window.innerWidth-width-12));
+    report.style.setProperty('--report-shift',(left-rect.left)+'px');
+    const below=window.innerHeight-rect.bottom,above=rect.top;
+    wrapper.classList.toggle('report-above',below<360&&above>below);
+    report.style.setProperty('--report-height',Math.max(80,Math.min(430,Math.max(above,below)-12))+'px');
+    if(!image.hasAttribute('src'))image.src=screenshot;
+   }
+   wrapper.addEventListener('pointerenter',positionReport);
+   wrapper.addEventListener('focusin',positionReport);
+   wrapper.addEventListener('keydown',event=>{
+    if(event.key==='Escape'&&wrapper.dataset.dismissed!=='true'){
+     event.stopPropagation();control.focus({preventScroll:true});wrapper.dataset.dismissed='true';
+    }
+   });
+  }
+ }
  draw=function(){
-  $('#states').replaceChildren();$('#devices').replaceChildren();
+  $('#states').replaceChildren(developmentProgress);$('#devices').replaceChildren();
   const assigned=new Set(),groups=RIG.groups.map(g=>({...g,states:g.states.filter(s=>C.states.includes(s))}));
   for(const g of groups)for(const s of g.states)assigned.add(s);
   const remaining=C.states.filter(s=>!assigned.has(s));if(remaining.length)groups.push({label:'设计页面',states:remaining});
   for(const g of groups){if(!g.states.length)continue;const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent=g.label;details.open=g.states.includes(state);details.append(summary);for(const s of g.states){const b=document.createElement('button');b.dataset.page=s;b.textContent=C.labels?.[s]||s;b.className=s===state?'active':'';b.onclick=()=>{$('#error').textContent='';state=s;draw()};details.append(pageRow(s,b))}$('#states').append(details)}
   for(const d of C.devices){const b=document.createElement('button');b.textContent=d.name||d.id;b.dataset.device=d.id;b.className=d.id===device?'active':'';b.setAttribute('aria-pressed',String(d.id===device));b.onclick=()=>{$('#error').textContent='';device=d.id;draw()};$('#devices').append(b)}
+  decorateDevices();
   $('#title').textContent=C.labels?.[state]||state;const d=C.devices.find(d=>d.id===device);$('#size').textContent=d.physicalW?`${d.physicalW} × ${d.physicalH} px · ${d.name} · ${RIG.revision}`:`${d.w} × ${d.h} 设计画幅 · ${d.name} · ${RIG.revision}`;
   const rel=(C.image_template||'screens/{device}/{state}.png').replace('{device}',device).replace('{state}',state);
   const url='/revisions/'+encodeURIComponent(RIG.revision)+'/'+rel.split('/').map(encodeURIComponent).join('/');$('#image').src=url;$('#image').alt=(C.labels?.[state]||state)+' · '+d.name;$('#raw').href=url;history.replaceState(null,'',location.pathname+location.search+'#'+state+'@'+device);
@@ -70,6 +169,13 @@ var C,state,device,draw,resolveState,RIG;
   active.scrollIntoView({block:'nearest',inline:'nearest'});
  });
  draw();const script=document.createElement('script');script.src='/assets/review.js';script.onload=()=>{const checks=document.createElement('script');checks.src='/assets/page-checks.js';document.body.append(checks)};document.body.append(script);
+ fetch(revisionRoot+'implementation-evidence.json').then(r=>{
+  if(r.status===404)return null;
+  if(!r.ok)throw Error();
+  return r.json();
+ }).then(data=>{
+  implementation=data?.pages||{};showDevelopmentProgress(data?.exclusions);decorateDevices();
+ }).catch(()=>{developmentProgress.querySelector('small').textContent='暂时无法读取测试证据'});
  // Follow the latest revision in this tab; explicitly selected historical revisions remain pinned.
  setInterval(async()=>{if(params.has('revision'))return;try{const r=await fetch('/api/project',{cache:'no-store'});if(!r.ok)return;const next=await r.json();if(next.revision!==RIG.revision){if(window.rigCanRefresh&&!window.rigCanRefresh()){$('#error').textContent='新版本 '+next.revision+' 已就绪，请先保存当前评论；保存后本页会更新。';return}location.reload()}}catch{}},3000);
 })().catch(e=>document.querySelector('#error').textContent=e.message);

@@ -32,7 +32,8 @@ def main():
     init=sub.add_parser('init');init.add_argument('directory')
     serve=sub.add_parser('serve');serve.add_argument('project');serve.add_argument('--port',type=int,default=18766)
     start=sub.add_parser('start');start.add_argument('project');start.add_argument('--port',type=int,default=18766)
-    check=sub.add_parser('check');check.add_argument('project')
+    check=sub.add_parser('check');check.add_argument('project');check.add_argument('--revision')
+    check.add_argument('--require-alpha',action='store_true',help='Require complete simulator evidence for the selected or current revision')
     components=sub.add_parser('components');components.add_argument('project');components.add_argument('--revision')
     imp=sub.add_parser('import-review');imp.add_argument('--store',required=True);imp.add_argument('--workspace',required=True);imp.add_argument('--output',required=True)
     feed=sub.add_parser('feedback');feed.add_argument('project');feed.add_argument('--format',choices=['json','markdown'],default='markdown')
@@ -69,8 +70,9 @@ def main():
             print(start(args.project,args.port))
         elif args.command=='check':
             p=Project(args.project);count=0
-            for revision in p.revisions:count+=p.validate_assets(revision)
-            print(json.dumps({'project':p.id,'revisions':len(p.revisions),'images':count,'ok':True}))
+            revisions=[args.revision or p.current] if args.revision or args.require_alpha else list(p.revisions)
+            for revision in revisions:count+=p.validate_assets(revision,require_alpha=args.require_alpha)
+            print(json.dumps({'project':p.id,'revisions':len(revisions),'images':count,'ok':True}))
         elif args.command=='components':
             from .components import load
             print(json.dumps(load(Project(args.project),args.revision),ensure_ascii=False,indent=2))

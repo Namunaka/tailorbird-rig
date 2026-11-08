@@ -118,6 +118,31 @@ class CoreTests(unittest.TestCase):
   self.assertEqual(list(result['progress']),['welcome'])
   self.assertIsNone(result['overall'])
   self.assertEqual(result['progress']['welcome']['confirmed'],7)
+ def test_alpha_requires_passing_evidence_or_explicit_exclusions(self):
+  project=Project(self.config);root,manifest=project.revision('v1')
+  entry=dict(status='alpha',environment='simulator',result='passed',build='test',
+             summary='Form passed',screenshot='screens/phone-a/form.png')
+  data={'pages':{'form':{'phone-a':entry}}}
+  path=root/'implementation-evidence.json'
+  atomic(path,data)
+  with self.assertRaisesRegex(ValueError,'Missing Alpha simulator evidence'):
+   project.validate_assets()
+  data['exclusions']={'form':{d['id']:{'kind':'not_implemented','reason':'Fixture implements A only'}
+                              for d in manifest['devices'] if d['id']!='phone-a'}}
+  atomic(path,data)
+  self.assertGreater(project.validate_assets(),0)
+  with self.assertRaisesRegex(ValueError,'页面未登记'):
+   project.validate_assets(require_alpha=True)
+  for page in set(manifest['states'])-{'form'}:
+   data['pages'][page]={}
+   data['exclusions'][page]={d['id']:{'kind':'out_of_scope','reason':'Fixture only covers the form'}
+                             for d in manifest['devices']}
+  atomic(path,data)
+  self.assertGreater(project.validate_assets(require_alpha=True),0)
+  entry['result']='failed'
+  atomic(path,data)
+  with self.assertRaisesRegex(ValueError,'Expected passing Alpha simulator evidence'):
+   project.validate_assets()
  def test_withdrawing_inherited_confirmation_keeps_history(self):
   from tailorbird_rig.page_checks import snapshot,confirm
   def set_checked(revision,desired):

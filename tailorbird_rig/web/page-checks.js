@@ -58,18 +58,12 @@
    b.dataset.check=check.needs_work?'needs_work':check.needs_check?'needs_check':value===100?'confirmed':value>0?'partial':'default';
    b.style.setProperty('--review-progress',value+'%');
    b.title=check.confirmed+' / '+check.total+' 个机型已确认'+(check.needs_work?' · 有机型待修改':check.needs_check?' · 有机型待复查':'');
-   let count=b.querySelector('.page-review-percent');
-   if(!count){
-    count=document.createElement('span');count.className='page-review-percent';
-    const label=document.createElement('span');label.textContent=b.textContent;
-    b.replaceChildren(count,label);
-   }
-   count.textContent=value+'%';
+   b.querySelector('.page-review-percent').textContent=value+'%';
   }
   for(const b of document.querySelectorAll('#devices button[data-device]')){
    const status=deviceStatuses[state]?.[b.dataset.device];
    b.dataset.check=status||'default';
-   b.title=status==='confirmed'?'当前页面 · 已检查确认':status==='needs_work'?'当前页面 · 待修改':status==='needs_check'?'当前页面 · 待复查':'当前页面 · 尚未确认';
+   if(!b.closest('.device-evidence'))b.title=status==='confirmed'?'当前页面 · 已检查确认':status==='needs_work'?'当前页面 · 待修改':status==='needs_check'?'当前页面 · 待复查':'当前页面 · 尚未确认';
   }
   const checked=current?.status==='confirmed';
   note.textContent=checked?'当前界面已检查确认，再点一次可撤回':current?.status==='needs_work'?'当前机型有标记，待修改':current?.status==='needs_check'?'修改已完成，等待复查':'当前界面尚未确认';
