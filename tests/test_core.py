@@ -143,6 +143,36 @@ class CoreTests(unittest.TestCase):
   atomic(path,data)
   with self.assertRaisesRegex(ValueError,'Expected passing Alpha simulator evidence'):
    project.validate_assets()
+ def test_live_preview_validation_and_confirmation_history(self):
+  from tailorbird_rig.page_checks import snapshot,confirm
+  root=self.root/'designs/v1'
+  manifest=read(root/'coverage.json',{})
+  manifest['live_previews']={'welcome':'../escape.html'}
+  atomic(root/'coverage.json',manifest)
+  with self.assertRaisesRegex(ValueError,'relative HTML path'):
+   Project(self.config).validate_assets()
+  manifest['live_previews']={'welcome':'preview.html'}
+  atomic(root/'coverage.json',manifest)
+  with self.assertRaisesRegex(ValueError,'Missing live preview HTML'):
+   Project(self.config).validate_assets()
+  (root/'preview.html').write_text('<button>Check</button>')
+  Project(self.config).validate_assets()
+  for device in ('phone-a','phone-b'):
+   check=snapshot(self.store,'v1',device)['pages']['welcome']
+   confirm(self.store,dict(revision='v1',page='welcome',device=device,**check))
+  v2=self.root/'designs/v2'
+  shutil.copytree(root,v2)
+  manifest['devices'][0]['w']+=10
+  atomic(v2/'coverage.json',manifest)
+  activate(self.config,'v2',v2)
+  self.assertEqual(snapshot(self.store,'v2','phone-a')['pages']['welcome']['status'],'default')
+  self.assertEqual(snapshot(self.store,'v2','phone-b')['pages']['welcome']['status'],'confirmed')
+  v3=self.root/'designs/v3'
+  shutil.copytree(v2,v3)
+  (v3/'preview.html').write_text('<button>Changed</button>')
+  activate(self.config,'v3',v3)
+  self.assertEqual(snapshot(self.store,'v3','phone-b')['pages']['welcome']['status'],'default')
+  self.assertEqual(snapshot(self.store,'v1','phone-a')['pages']['welcome']['status'],'confirmed')
  def test_withdrawing_inherited_confirmation_keeps_history(self):
   from tailorbird_rig.page_checks import snapshot,confirm
   def set_checked(revision,desired):

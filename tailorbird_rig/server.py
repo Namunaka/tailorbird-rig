@@ -8,17 +8,31 @@ from .config import Project, confined, identifier
 from .store import ReviewStore, read
 from .codex_work import CodexWork, WorkError
 WEB = Path(__file__).parent/'web'
+LIVE_PREVIEW_POLICY = (
+    "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; "
+    "style-src 'unsafe-inline'; img-src data: blob:; font-src data:; "
+    "media-src data: blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"
+)
 
 class Handler(BaseHTTPRequestHandler):
-    def respond(self, status, body, mime='application/json; charset=utf-8'):
+    def respond(self, status, body, mime='application/json; charset=utf-8', *, policy=None):
         if not isinstance(body,bytes): body=json.dumps(body,ensure_ascii=False).encode()
         self.send_response(status); self.send_header('Content-Type',mime)
         self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff')
+        if policy:self.send_header('Content-Security-Policy',policy)
         self.send_header('Content-Length',str(len(body))); self.end_headers(); self.wfile.write(body)
 
-    def file(self, path):
+    def file(self, path, *, policy=None):
         if not path.is_file(): self.respond(404,{'error':'Not found'}); return
-        self.respond(200,path.read_bytes(),mimetypes.guess_type(path.name)[0] or 'application/octet-stream')
+        self.respond(200,path.read_bytes(),mimetypes.guess_type(path.name)[0] or 'application/octet-stream',policy=policy)
+
+    def revision_file(self, root, manifest, relative):
+        target=confined(root,relative)
+        previews=manifest.get('live_previews',{})
+        sandboxed=isinstance(previews,dict) and (
+            relative in previews.values() or target.relative_to(root).as_posix() in previews.values()
+        )
+        self.file(target,policy=LIVE_PREVIEW_POLICY if sandboxed else None)
 
     @property
     def revision(self):
@@ -72,13 +86,13 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith('/screens/'):
                 root,_=project.revision();self.file(confined(root,path[1:]));return
             if path.startswith('/design/'):
-                root,_=project.revision(self.revision); self.file(confined(root,path[8:])); return
+                root,manifest=project.revision(self.revision); self.revision_file(root,manifest,path[8:]); return
             if path.startswith('/revisions/'):
-                rev,rel=path[11:].split('/',1);root,_=project.revision(rev)
+                rev,rel=path[11:].split('/',1);root,manifest=project.revision(rev)
                 if rel=='index.html':
                     from urllib.parse import quote
                     self.send_response(302);self.send_header('Location','/?revision='+quote(rev));self.end_headers();return
-                self.file(confined(root,rel));return
+                self.revision_file(root,manifest,rel);return
             if path.startswith('/mount/'):
                 name,rel=path[7:].split('/',1);root=project.raw.get('mounts',{})[name]
                 self.file(confined(project.base/root,rel));return

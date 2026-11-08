@@ -55,6 +55,68 @@ var C,state,device,draw,resolveState,RIG;
   if(parts.some(part=>!part||part==='.'||part==='..'))return null;
   return revisionRoot+parts.map(encodeURIComponent).join('/');
  }
+ const image = $('#image');
+ const previewTools = document.createElement('div');
+ previewTools.className = 'live-preview-tools';
+ const previewToggle = document.createElement('button');
+ previewToggle.type = 'button';
+ const previewHint = document.createElement('small');
+ previewTools.append(previewToggle, previewHint);
+ image.before(previewTools);
+ let previewFrame, previewUrl, previewDevice, previewKey;
+ let showLive = true;
+
+ function fitPreview() {
+  if (!previewFrame) return;
+  const width = Math.ceil(previewDevice.w);
+  const height = Math.ceil(previewDevice.h);
+  const scale = Math.min(image.clientWidth / width, image.clientHeight / height);
+  previewFrame.style.width = width + 'px';
+  previewFrame.style.height = height + 'px';
+  previewFrame.style.left = (image.clientWidth - width * scale) / 2 + 'px';
+  previewFrame.style.top = (image.clientHeight - height * scale) / 2 + 'px';
+  previewFrame.style.transform = 'scale(' + scale + ')';
+ }
+
+ function showPreviewMode() {
+  previewTools.hidden = !previewUrl;
+  const live = Boolean(previewUrl && showLive);
+  image.closest('.review-workspace')?.classList.toggle('show-live-preview', live);
+  if (!live) {
+   previewFrame?.remove();
+   previewFrame = null;
+  } else if (!previewFrame && image.closest('.review-stage')) {
+   previewFrame = document.createElement('iframe');
+   previewFrame.className = 'live-preview-frame';
+   previewFrame.title = (C.labels[state] || state) + ' · 交互预览';
+   previewFrame.setAttribute('sandbox', 'allow-scripts');
+   previewFrame.src = previewUrl + '?' + new URLSearchParams({page:state,device});
+   image.after(previewFrame);
+   fitPreview();
+  }
+  previewToggle.textContent = live ? '切到静态图批注' : '试用交互稿';
+  previewHint.textContent = live ? '在画布内直接操作，试完可在右侧检查确认。' : '在静态图上圈画，批注按本页面和机型保存。';
+ }
+
+ previewToggle.onclick = () => { showLive = !showLive; showPreviewMode(); };
+ window.rigShowStaticPreview = () => {
+  if (!previewFrame) return;
+  showLive = false;
+  showPreviewMode();
+ };
+ new ResizeObserver(fitPreview).observe(image);
+
+ function updatePreview(currentDevice) {
+  const key = state + '@' + device;
+  if (previewKey === key) return;
+  previewFrame?.remove();
+  previewFrame = null;
+  previewKey = key;
+  previewUrl = evidenceUrl(C.live_previews?.[state]);
+  previewDevice = currentDevice;
+  showLive = true;
+  showPreviewMode();
+ }
  function alphaEvidence(page,id){
   const entry=implementation[page]?.[id];
   return entry?.status==='alpha'&&entry.environment==='simulator'&&entry.result==='passed'&&
@@ -147,6 +209,7 @@ var C,state,device,draw,resolveState,RIG;
   $('#title').textContent=C.labels?.[state]||state;const d=C.devices.find(d=>d.id===device);$('#size').textContent=d.physicalW?`${d.physicalW} × ${d.physicalH} px · ${d.name} · ${RIG.revision}`:`${d.w} × ${d.h} 设计画幅 · ${d.name} · ${RIG.revision}`;
   const rel=(C.image_template||'screens/{device}/{state}.png').replace('{device}',device).replace('{state}',state);
   const url='/revisions/'+encodeURIComponent(RIG.revision)+'/'+rel.split('/').map(encodeURIComponent).join('/');$('#image').src=url;$('#image').alt=(C.labels?.[state]||state)+' · '+d.name;$('#raw').href=url;history.replaceState(null,'',location.pathname+location.search+'#'+state+'@'+device);
+  updatePreview(d);
  };
  const arrows={ArrowUp:['#states [data-page]',-1],ArrowDown:['#states [data-page]',1],
                ArrowLeft:['#devices [data-device]',-1],ArrowRight:['#devices [data-device]',1]};
@@ -168,7 +231,7 @@ var C,state,device,draw,resolveState,RIG;
   if(keepFocus)active.focus({preventScroll:true});
   active.scrollIntoView({block:'nearest',inline:'nearest'});
  });
- draw();const script=document.createElement('script');script.src='/assets/review.js';script.onload=()=>{const checks=document.createElement('script');checks.src='/assets/page-checks.js';document.body.append(checks)};document.body.append(script);
+ draw();const script=document.createElement('script');script.src='/assets/review.js';script.onload=()=>{showPreviewMode();const checks=document.createElement('script');checks.src='/assets/page-checks.js';document.body.append(checks)};document.body.append(script);
  fetch(revisionRoot+'implementation-evidence.json').then(r=>{
   if(r.status===404)return null;
   if(!r.ok)throw Error();

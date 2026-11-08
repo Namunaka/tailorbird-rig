@@ -25,6 +25,19 @@ def covered_image(root, manifest, page, device):
     template = manifest.get('image_template','screens/{device}/{state}.png')
     return confined(root, template.format(device=device,state=page))
 
+def validate_live_previews(root, manifest):
+    previews = manifest.get('live_previews', {})
+    if not isinstance(previews, dict) or previews.keys() - set(manifest['states']):
+        raise ConfigError('Live previews must reference existing pages')
+    for relative in previews.values():
+        if not isinstance(relative, str) or any(part in {'', '.', '..'} for part in relative.split('/')):
+            raise ConfigError('Live previews require a relative HTML path')
+        if relative == 'index.html':
+            raise ConfigError('The revision index is reserved for the review viewer')
+        path = confined(root, relative)
+        if path.suffix.lower() != '.html' or not path.is_file():
+            raise ConfigError('Missing live preview HTML: ' + relative)
+
 def validate_implementation_evidence(root, manifest, required=False):
     path=confined(root,'implementation-evidence.json')
     if not path.exists():
@@ -121,6 +134,7 @@ class Project:
         ident=revision or self.current;root,manifest=self.revision(ident);count=0
         from .components import load
         load(self,ident)
+        validate_live_previews(root,manifest)
         validate_implementation_evidence(root,manifest,required=require_alpha)
         for device in manifest['devices']:
             for state in manifest['states']:

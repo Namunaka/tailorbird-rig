@@ -310,6 +310,42 @@ const check=(name,pass)=>{checks.push({name,pass});if(!pass)throw Error(name)};
  check('dragging the arrow moves both endpoints',(await data()).marks.find(m=>m.id===arrow.id).points.every((point,index)=>point[0]>arrow.points[index][0]));
  await p.locator('#review-undo').click();await saved();
  check('undo removes the arrow',(await data()).marks.find(m=>m.id===arrow.id).deleted);
+ const liveRoot=path.join(project,'designs/v5');
+ fs.cpSync(path.join(project,'designs/v4'),liveRoot,{recursive:true});
+ const coveragePath=path.join(liveRoot,'coverage.json'),coverage=JSON.parse(fs.readFileSync(coveragePath,'utf8'));
+ coverage.live_previews={form:'preview.html'};
+ fs.writeFileSync(coveragePath,JSON.stringify(coverage));
+ fs.writeFileSync(path.join(liveRoot,'preview.html'),`<!doctype html><button>Try action</button><output></output>
+ <script>
+ const output=document.querySelector('output');
+ document.querySelector('button').onclick=()=>{
+  let isolated=false;try{parent.document.title}catch{isolated=true}
+  output.textContent=new URLSearchParams(location.search).get('device')+' '+innerWidth+' '+isolated;
+ };
+ </script>`);
+ cp.execFileSync(python,['-m','tailorbird_rig','publish',config,'--revision','v5','--root',liveRoot],{cwd:root});
+ await p.goto(base+'/?revision=v5#form@phone-a');
+ const live=p.frameLocator('.live-preview-frame'),tryAction=live.getByRole('button',{name:'Try action'});
+ await tryAction.click();
+ const logicalWidth=id=>Math.ceil(coverage.devices.find(d=>d.id===id).w);
+ await live.locator('output').getByText('phone-a '+logicalWidth('phone-a')+' true',{exact:true}).waitFor();
+ const liveResponse=await p.request.get(base+'/revisions/v5/preview.html');
+ check('live preview runs in canvas with opaque origin and a server sandbox',
+  (await p.locator('.live-preview-frame').getAttribute('sandbox'))==='allow-scripts'&&liveResponse.headers()['content-security-policy'].includes('sandbox allow-scripts'));
+ await p.locator('#devices [data-device="phone-b"]').click();
+ await tryAction.click();
+ await live.locator('output').getByText('phone-b '+logicalWidth('phone-b')+' true',{exact:true}).waitFor();
+ await p.locator('#page-check-confirm').click();
+ await p.locator('#page-check-confirm[aria-pressed=true]').waitFor();
+ check('live preview uses the selected device and existing confirmation',p.url().endsWith('#form@phone-b')&&await p.locator('.live-preview-frame').isVisible());
+ await p.locator('#review-tools [data-tool=rect]').click();
+ await p.locator('#image').waitFor();
+ check('drawing switches the same canvas to its static reference',await p.locator('.live-preview-frame').count()===0&&
+  (await p.locator('#image').getAttribute('src')).endsWith('/screens/phone-b/form.png')&&await p.locator('.review-overlay').evaluate(el=>el.classList.contains('drawing')));
+ await p.getByRole('button',{name:'试用交互稿'}).click();
+ await tryAction.waitFor();
+ await p.locator('#states [data-page="welcome"]').click();
+ check('ordinary design pages have no live canvas controls',await p.locator('.live-preview-frame').count()===0&&!(await p.locator('.live-preview-tools').isVisible()));
  for(const width of [980,390]){await p.setViewportSize({width,height:844});check('responsive workspace '+width,await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))}
  check('no JavaScript errors',errors.length===0);fs.mkdirSync(path.join(root,'test-results'),{recursive:true});await p.screenshot({path:path.join(root,'test-results/browser-mobile.png')});fs.writeFileSync(path.join(root,'test-results/browser.json'),JSON.stringify({pass:true,checks},null,2));console.log(JSON.stringify({pass:true,checks:checks.length}));
 })().catch(e=>{console.error(e.stack);process.exitCode=1;fs.mkdirSync(path.join(root,'test-results'),{recursive:true});fs.writeFileSync(path.join(root,'test-results/browser.json'),JSON.stringify({pass:false,checks,error:e.message},null,2))}).finally(async()=>{if(browser)await browser.close();if(server)server.kill()});

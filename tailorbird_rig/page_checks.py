@@ -32,6 +32,11 @@ class _RevisionContent:
 
     def digest(self,page,device):
         parts=[_file_digest(covered_image(self.root,self.manifest,page,device))]
+        preview=self.manifest.get('live_previews',{}).get(page)
+        if preview:
+            viewport=next(item for item in self.manifest['devices'] if item['id']==device)
+            parts.append({'preview':_file_digest(confined(self.root,preview)),
+                          'viewport':[viewport['w'],viewport['h']]})
         if self.elements_digest is not None:parts.append(self.elements_digest)
         for animation in self.manifest.get('animations',[]):
             if animation.get('pages') and page not in animation['pages']:continue
