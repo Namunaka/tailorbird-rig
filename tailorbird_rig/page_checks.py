@@ -3,7 +3,7 @@ import hashlib, json
 from collections import defaultdict
 from datetime import datetime, timezone
 from functools import lru_cache
-from .config import confined, covered_image
+from .config import Project, confined, covered_image
 from .store import atomic, read
 
 FINGERPRINT_FIELDS=('content_sha256','feedback_sha256')
@@ -28,9 +28,59 @@ class _RevisionContent:
         self.root,self.manifest=project.revision(revision)
         elements=load(project,revision)
         self.elements_digest=None if elements['example'] else elements['sha256']
+        self.elements=elements
+        self.components={item['id']:item for item in elements['system']['components']}
+        self.devices={item['id']:item for item in self.manifest['devices']}
+        self.pages=set(self.manifest['states'])
+        self.docs=read(confined(self.root,'page-docs.json'),{}).get('pages',{})
         self.animations={}
+        self.page_digests={}
+        self.legacy_digests={}
+
+    def component_content(self,ref):
+        ident,_,variant=ref.partition(':')
+        component=self.components[ident]
+        option=next((v for v in component.get('variants',[]) if v['id']==variant),{})
+        return {
+            'id':ref,'kind':component['kind'],
+            'props':{**component.get('props',{}),**option.get('props',{})},
+            'tokens':{**self.elements['system']['tokens'],**component.get('tokens',{}),**option.get('tokens',{})},
+            'children':[self.component_content(child) for child in component.get('children',[])],
+        }
+
+    def page_digest(self,page):
+        if page not in self.pages:
+            return None
+        if page not in self.page_digests:
+            refs=sorted(set(self.elements['usage'].get(page,[])))
+            shots=[(ident,_file_digest(covered_image(self.root,self.manifest,page,ident)))
+                   for ident in sorted(self.devices)]
+            preview=self.manifest.get('live_previews',{}).get(page)
+            viewports=[(ident,self.devices[ident]['w'],self.devices[ident]['h']) for ident in sorted(self.devices)]
+            parts=[shots, _file_digest(confined(self.root,preview)) if preview else None,
+                   viewports if preview else None,
+                   [self.component_content(ref) for ref in refs],
+                   self.animation_content(page),self.docs.get(page)]
+            self.page_digests[page]=hashlib.sha256(json.dumps(parts,sort_keys=True).encode()).hexdigest()
+        return self.page_digests[page]
+
+    def animation_content(self,page):
+        hashes=[]
+        for animation in self.manifest.get('animations',[]):
+            if animation.get('pages') and page not in animation['pages']:continue
+            path=animation['path']
+            if path not in self.animations:
+                self.animations[path]=_file_digest(confined(self.root,path))
+            hashes.append(self.animations[path])
+        return hashes
 
     def digest(self,page,device):
+        key=page,device
+        if key not in self.legacy_digests:
+            self.legacy_digests[key]=self.legacy_digest(page,device)
+        return self.legacy_digests[key]
+
+    def legacy_digest(self,page,device):
         parts=[_file_digest(covered_image(self.root,self.manifest,page,device))]
         preview=self.manifest.get('live_previews',{}).get(page)
         if preview:
@@ -38,16 +88,21 @@ class _RevisionContent:
             parts.append({'preview':_file_digest(confined(self.root,preview)),
                           'viewport':[viewport['w'],viewport['h']]})
         if self.elements_digest is not None:parts.append(self.elements_digest)
-        for animation in self.manifest.get('animations',[]):
-            if animation.get('pages') and page not in animation['pages']:continue
-            path=animation['path']
-            if path not in self.animations:
-                self.animations[path]=_file_digest(confined(self.root,path))
-            parts.append(self.animations[path])
+        parts.extend(self.animation_content(page))
         return hashlib.sha256(json.dumps(parts).encode()).hexdigest()
 
+@lru_cache(maxsize=64)
+def _published_content(config_path, config_version, revision):
+    return _RevisionContent(Project(config_path),revision)
+
+def revision_content(project,revision):
+    # Historical revisions are immutable. Always re-read the current revision for confirmations.
+    if revision==project.current:
+        return _RevisionContent(project,revision)
+    return _published_content(project.filename,project.config_version,revision)
+
 def content_digest(project, revision, page, device):
-    return _RevisionContent(project,revision).digest(page,device)
+    return _RevisionContent(project,revision).page_digest(page)
 
 def feedback_digest(issues):
     fields=('number','user_quote','attachments','status','work','resolved_content_sha256')
@@ -75,16 +130,34 @@ class _Review:
                           if not m.get('deleted') and m.get('revision') in self.visible)
         self.records=_group(r for r in read(store.root/'page-checks.json',{'records':[]})['records']
                             if r['revision'] in self.visible)
-        self.digests={}
         self.content_by_revision={}
+        self.draft_starts={}
+        self.draft_boundaries=set()
 
-    def digest(self,revision,page,device):
-        key=revision,page,device
-        if key not in self.digests:
-            if revision not in self.content_by_revision:
-                self.content_by_revision[revision]=_RevisionContent(self.project,revision)
-            self.digests[key]=self.content_by_revision[revision].digest(page,device)
-        return self.digests[key]
+    def content(self,revision):
+        if revision not in self.content_by_revision:
+            self.content_by_revision[revision]=revision_content(self.project,revision)
+        return self.content_by_revision[revision]
+
+    def same_draft(self,page,revision):
+        if page not in self.draft_starts:
+            self.draft_starts[page]=self.index
+        start=self.draft_starts[page]
+        target=self.revisions.index(revision)
+        current=self.content(self.revision).page_digest(page)
+        while start>target:
+            if page in self.draft_boundaries:
+                return False
+            try:
+                previous=self.content(self.revisions[start-1]).page_digest(page)
+            except (ValueError,KeyError,FileNotFoundError):
+                previous=None
+            if previous!=current:
+                self.draft_boundaries.add(page)
+                return False
+            start-=1
+            self.draft_starts[page]=start
+        return True
 
     def status(self,page,device,detail=False):
         key=page,device
@@ -93,16 +166,8 @@ class _Review:
         records=self.records.get(key,[])
         if not (detail or issues or marks or records):
             return {'status':'default'}
-        content=self.digest(self.revision,*key)
-
-        def same_draft(revision):
-            try:
-                return all(self.digest(r,*key)==content
-                           for r in reversed(self.revisions[self.revisions.index(revision):self.index]))
-            except (ValueError,KeyError,FileNotFoundError):
-                return False
-
-        marks=[m for m in marks if same_draft(m['revision'])]
+        content=self.content(self.revision).page_digest(page)
+        marks=[m for m in marks if self.same_draft(page,m['revision'])]
         legacy=feedback_digest(issues)
         fingerprint=sorted((m['id'],m.get('updated_at') or m.get('created_at') or '') for m in marks)
         feedback=hashlib.sha256(json.dumps([legacy,fingerprint]).encode()).hexdigest() if marks else legacy
@@ -110,12 +175,13 @@ class _Review:
         # A later revision takes precedence over actions taken on older drafts.
         for record in reversed(sorted(records,key=lambda r:self.revisions.index(r['revision']))):
             if record.get('revoked'):break
-            if record['content_sha256']!=content:continue
+            if not self.same_draft(page,record['revision']):continue
+            if record['content_sha256']!=content and record['content_sha256']!=self.content(record['revision']).digest(*key):continue
             # Keep approvals from before mark tracking if no active mark has changed since.
             matches=record['feedback_sha256']==feedback
             if not record.get('tracks_marks') and record['feedback_sha256']==legacy:
                 matches=all(stamp and stamp<=record['at'] for _,stamp in fingerprint)
-            if matches and same_draft(record['revision']):
+            if matches:
                 return dict(result,status='confirmed',confirmed_at=record['at'])
 
         linked_marks={i.get('annotation_id') for i in issues}
@@ -123,7 +189,13 @@ class _Review:
             m['id'] not in linked_marks for m in marks
         ):
             return dict(result,status='needs_work')
-        resolved=any(i.get('resolved_content_sha256')==content for i in issues)
+        def resolved_here(issue):
+            revision=issue.get('resolved_revision')
+            fingerprint=issue.get('resolved_content_sha256')
+            if revision not in self.visible or not fingerprint or not self.same_draft(page,revision):
+                return False
+            return fingerprint==content or fingerprint==self.content(revision).digest(*key)
+        resolved=any(resolved_here(i) for i in issues)
         return dict(result,status='needs_check' if resolved else 'default')
 
 

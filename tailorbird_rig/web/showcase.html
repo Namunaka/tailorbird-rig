@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+ <title>演示库 · Tailorbird Rig</title>
+ <link rel="stylesheet" href="/assets/showcase.css">
+</head>
+<body>
+ <header>
+  <a href="/" id="review-back">← 返回评审</a>
+  <nav aria-label="演示库分类">
+   <a href="?kind=effects" data-kind="effects">特效库</a>
+   <a href="?kind=components" data-kind="components">能力组件库</a>
+   <a href="/components.html">公共元素集</a>
+  </nav>
+  <h1 id="title">演示库</h1>
+  <p id="description"></p>
+ </header>
+ <main>
+  <nav id="entries" aria-label="条目"></nav>
+  <section id="entry" aria-labelledby="entry-title" hidden>
+   <div class="entry-header">
+    <div><h2 id="entry-title"></h2><code id="entry-id"></code></div>
+    <button type="button" id="restart">重置演示</button>
+   </div>
+   <p id="entry-description"></p>
+   <iframe id="demo" sandbox="allow-scripts" title="交互演示"></iframe>
+   <div id="entry-details"></div>
+   <div id="resources"></div>
+  </section>
+  <p id="status" role="status">正在读取项目演示…</p>
+ </main>
+ <script src="/assets/showcase.js"></script>
+</body>
+</html>

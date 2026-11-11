@@ -1,7 +1,7 @@
 (()=>{
  const panel=document.querySelector('#review-panel'),area=document.createElement('section');area.id='page-check-controls';
  area.innerHTML='<h3>界面检查</h3><p id="page-check-state" role="status">正在读取检查状态…</p><div class="page-check-actions"><button id="page-check-confirm" disabled><span>检查确认</span><kbd aria-hidden="true"></kbd></button><button id="page-check-all" disabled><span>全部确认</span><kbd aria-hidden="true"></kbd></button></div><p>红色待修改 · 黄色待复查 · 绿色已通过。左侧按所有机型累计。</p>';
- panel.insertBefore(area,document.querySelector('#review-tools'));
+ panel.prepend(area);
  let pages={},progress={},deviceStatuses={},overviewReady=false,overviewPending=false,writeGeneration=0;
  let loadedDevice='',batchPage='',batchDigest='',pending=null,confirming=false;
  const button=document.querySelector('#page-check-confirm'),allButton=document.querySelector('#page-check-all'),note=document.querySelector('#page-check-state');
@@ -39,7 +39,7 @@
    const counts=Object.values(progress);
    const overall={confirmed:counts.reduce((sum,page)=>sum+page.confirmed,0),total:C.states.length*C.devices.length,
                   needs_work:counts.some(page=>page.needs_work),needs_check:counts.some(page=>page.needs_check)};
-   const sidebar=document.querySelector('#states');
+   const sidebar=document.querySelector('#review-progress');
    let summary=sidebar.querySelector('#overall-review-progress');
    if(!summary){
     summary=document.createElement('div');summary.id='overall-review-progress';
@@ -207,7 +207,6 @@
  });
  const previous=draw;draw=function(){previous();paint();refresh()};
  document.querySelector('#image').addEventListener('load',paint);
- document.addEventListener('rig:review-saved',()=>refresh(true));
  refresh();refreshOverview();
  setInterval(()=>{if(!document.hidden)refresh()},3000);
  setInterval(()=>{if(!document.hidden)refreshOverview()},15000);

@@ -41,6 +41,8 @@
      <h2 id="tool-design-label">设计工具</h2>
      <div class="tool-items">
       <a class="tool-link" href="/components.html" id="component-library-link"><svg aria-hidden="true"><use href="#tool-library"/></svg>公共元素集</a>
+      <a class="tool-link" href="/assets/showcase.html?kind=effects" data-showcase><svg aria-hidden="true"><use href="#tool-motion"/></svg>特效库</a>
+      <a class="tool-link" href="/assets/showcase.html?kind=components" data-showcase><svg aria-hidden="true"><use href="#tool-library"/></svg>能力组件库</a>
       <a class="tool-link" href="/lottie.html" id="lottie-workbench-link"><svg aria-hidden="true"><use href="#tool-motion"/></svg>Lottie 动画工作台</a>
       <button class="tool-link" type="button" id="shortcut-settings" aria-haspopup="dialog" disabled>快捷键设置</button>
      </div>
@@ -76,9 +78,29 @@
    <div id="devices" role="group" aria-label="机型与形态" aria-keyshortcuts="ArrowLeft ArrowRight"></div>
    <h2 id="title"></h2>
    <small id="size"></small>
-   <img id="image" alt="当前设计稿">
-   <a id="raw" target="_blank" rel="noopener">打开原图 ↗</a>
+   <div class="review-workspace">
+    <div class="review-design">
+     <h3 class="review-media-heading">设计稿</h3>
+     <div class="review-stage"><img id="image" alt="当前设计稿"></div>
+     <a id="raw" target="_blank" rel="noopener">打开原图 ↗</a>
+    </div>
+    <section id="simulator-comparison" aria-labelledby="simulator-heading" hidden>
+     <h3 class="review-media-heading" id="simulator-heading">模拟器截图</h3>
+     <div class="review-stage"><img id="simulator-image" alt="当前机型的模拟器截图"></div>
+     <a id="simulator-raw" target="_blank" rel="noopener">打开原截图 ↗</a>
+    </section>
+   </div>
   </article>
+  <aside id="review-panel" aria-label="评审面板">
+   <section id="page-documents" aria-labelledby="page-documents-title">
+    <h3 id="page-documents-title">当前页文档</h3>
+    <div class="page-doc-links">
+     <a class="tool-link" data-doc="product" target="_blank" rel="noopener">产品文档 ↗</a>
+     <a class="tool-link" data-doc="test" target="_blank" rel="noopener">测试文档 ↗</a>
+    </div>
+   </section>
+   <section id="review-progress" aria-label="项目进度"></section>
+  </aside>
  </main>
  <script src="/assets/viewer.js"></script>
 </body>

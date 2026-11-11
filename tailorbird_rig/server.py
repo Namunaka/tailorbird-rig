@@ -62,6 +62,9 @@ class Handler(BaseHTTPRequestHandler):
             if path=='/api/components':
                 from .components import load
                 self.respond(200,load(project,self.revision));return
+            if path=='/api/implementation':
+                from .implementation import implementation_report
+                self.respond(200,implementation_report(project,self.revision or project.current));return
             if path=='/api/review': self.respond(200,store.snapshot(self.revision)); return
             if path=='/api/page-checks':
                 from .page_checks import snapshot

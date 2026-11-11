@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-**A local design review harness for AI agents: create interfaces, review multiple device sizes, annotate designs, hand off feedback, publish revisions, and update the same browser tab.**
+**A local design review harness for AI agents: create interfaces, review multiple device sizes, hand off feedback, publish revisions, and update the same browser tab.**
 
 The harness provides stable review tools. Each project owns its pages, target dimensions, assets, component definitions, and revisions. A design agent analyzes requirements, creates screens, and addresses feedback. The harness does not call an AI model, read conversations, or send messages to other chats by itself.
 
@@ -33,18 +33,16 @@ The starter contains 3 page states, 7 size/form presets, 21 synthetic images, an
 ## Reviewing and giving feedback
 
 1. Select a page on the left and a target size or foldable form at the top. Open the original image or switch to a historical revision when needed.
-2. Use the pen, rectangle, or location marker on the right. Write a comment, attach screenshots, and save it. Comments can also apply to the entire page without a drawn marker.
-3. Use **Copy pending feedback to chat** or **Download handoff** and give the result to an agent that can access the project files.
-4. The agent addresses issues by their original numbers, records results and evidence, creates a separate design revision, and publishes it.
-5. The view following the latest revision updates in the same tab. Continue reviewing there.
+2. Use the right panel to open the current product and test documents, confirm the design, and check project progress.
+3. Send new feedback and screenshots directly in the conversation. Use **Copy pending feedback** or **Download handoff** to share existing issues.
+4. The agent addresses feedback, records results and evidence, and publishes a separate design revision.
+5. The latest revision updates in the same tab so you can continue reviewing.
 
-The tools include pen, rectangle, arrow, location comments, color, stroke width, undo, and deletion. Browsing is the default: click existing annotations to select them and drag to move them. Drawing ends automatically after a stroke; clicking the active tool again or pressing Esc also exits drawing. There are no separate Browse or Select/Move buttons.
+Existing feedback retains the page, device, revision, source image SHA256, attachments, and stable issue numbers.
 
-The entire central area, including margins around the image, can be annotated. Delete edits text while an input is focused. Images can be uploaded, pasted, or dropped into the comment area.
+When the selected page and device have valid Alpha evidence, the center shows the design on the left and the simulator screenshot on the right. Both originals can be opened, and the images stack on narrow screens.
 
-Feedback is scoped by **page × device/size × revision**. Records preserve the source image SHA256, comment edits, geometry history, withdrawals, and stable issue numbers. New feedback on a completed issue reopens the same number. Saving a comment records feedback; an agent starts the actual design work when instructed in a conversation.
-
-Each page button shows its confirmed-device percentage, with green filling from left to right. Red indicates marks awaiting changes, yellow indicates changes awaiting review, and green indicates acceptance. Confirmations for other devices still count. **Confirm review** applies only to the current page and device. The overall progress above the page list reaches 100% only when every page–device pair is confirmed. Confirmations survive reloads; changed content or linked animations invalidate affected confirmations.
+Each page button has two independent bands. The top fills green as devices pass design review and shows red for changes requested or amber for re-review. The bottom fills dark green as device tests pass. **Confirm review** applies to the current page and device. The right panel shows totals across all page–device pairs. Publishing a changed page resets design and development progress for all its devices and removes its Alpha badges until retested. Unaffected pages retain their progress.
 
 ## Creating interfaces and continuing in a new chat
 
@@ -130,7 +128,11 @@ Never reuse revision IDs or overwrite images already under review. Publishing va
 
 `resolve` binds the result to the current design content: publish the updated design first, then record resolutions. It marks the page yellow for review and does not confirm it on the user's behalf. Only the user's confirmation action marks it green.
 
-The latest view checks for updates every 3 seconds and refreshes the same tab while preserving page and size selections. Unsaved comments, uploads, or active drawing defer the update. An explicitly selected historical revision stays pinned. Design completion and user acceptance are separate states.
+The latest view checks for updates every 3 seconds and refreshes the same tab while preserving page and size selections. An explicitly selected historical revision stays pinned. Design completion and user acceptance are separate states.
+
+## Effects and capability components
+
+The review toolbar opens interactive demos of project effects and reusable feature components. Set `mounts.library` and add `catalog.json` under that directory. Register each demo with a stable ID and name, and link its source or reference evidence. See the [feature contract](docs/feature-contract.md) for the catalog format.
 
 ## Shared component library and consistency
 
@@ -168,7 +170,7 @@ fetch('/api/components').then(r => r.json()).then(({system}) => {
 
 Content can vary by page; style/state differences belong in registered components or named variants. Historical pages must request their matching system using `?revision=REVISION_ID`. Native implementations should use the same specification, but native component code generation is not included.
 
-Copy and version the registry with new design revisions; preserve historical definitions. Registry changes invalidate old page acceptance. Reference declarations cannot prove that every pixel in a PNG follows the specification: retain rendering sources and perform visual checks.
+Copy and version the registry with new design revisions; preserve historical definitions. Changes to referenced components invalidate the affected pages. Reference declarations cannot prove that every pixel in a PNG follows the specification: retain rendering sources and perform visual checks.
 
 ## Lottie authoring studio
 

@@ -143,6 +143,45 @@ class CoreTests(unittest.TestCase):
   atomic(path,data)
   with self.assertRaisesRegex(ValueError,'Expected passing Alpha simulator evidence'):
    project.validate_assets()
+ def test_changed_page_resets_all_devices_and_ignores_copied_alpha(self):
+  from tailorbird_rig.implementation import implementation_report
+  from tailorbird_rig.page_checks import snapshot,confirm
+  v1,manifest=Project(self.config).revision('v1')
+  devices=[d['id'] for d in manifest['devices']]
+  pages={}
+  for page in manifest['states']:
+   pages[page]={}
+   for device in devices:
+    screenshot=f'evidence/{device}/{page}.png'
+    target=v1/screenshot
+    target.parent.mkdir(parents=True,exist_ok=True)
+    shutil.copyfile(v1/f'screens/{device}/{page}.png',target)
+    pages[page][device]=dict(status='alpha',environment='simulator',result='passed',build='fixture.1',
+                             summary='Passed',screenshot=screenshot)
+   check=snapshot(self.store,'v1',devices[0],page,page_only=True)
+   confirm(self.store,dict(revision='v1',page=page,device=devices[0],batch_sha256=check['batch_sha256']))
+  atomic(v1/'implementation-evidence.json',{'pages':pages})
+  v2=self.root/'designs/v2';shutil.copytree(v1,v2)
+  shutil.copyfile(v2/'screens/phone-a/form.png',v2/'screens/phone-a/welcome.png')
+  # This revision copied stale evidence for the changed page, and omitted evidence for other pages.
+  evidence=v2/'implementation-evidence.json'
+  atomic(evidence,{'pages':{'welcome':pages['welcome']}})
+  activate(self.config,'v2',v2)
+  project=Project(self.config)
+  review=snapshot(self.store,'v2','phone-b')['progress']
+  self.assertEqual(review['welcome']['confirmed'],0)
+  self.assertEqual(review['form']['confirmed'],len(devices))
+  self.assertEqual(snapshot(self.store,'v1','phone-b')['progress']['welcome']['confirmed'],len(devices))
+  report=implementation_report(project,'v2')['pages']
+  self.assertEqual(report['welcome'],{})
+  self.assertEqual(report['form']['phone-b']['revision'],'v1')
+  self.assertEqual(len(implementation_report(project,'v1')['pages']['welcome']),len(devices))
+  with self.assertRaisesRegex(ValueError,'待重测'):
+   project.validate_assets(require_alpha=True)
+  for entry in pages['welcome'].values():entry['build']='fixture.2'
+  atomic(evidence,{'pages':{'welcome':pages['welcome']}})
+  self.assertEqual(len(implementation_report(project,'v2')['pages']['welcome']),len(devices))
+  self.assertGreater(project.validate_assets(require_alpha=True),0)
  def test_live_preview_validation_and_confirmation_history(self):
   from tailorbird_rig.page_checks import snapshot,confirm
   root=self.root/'designs/v1'
@@ -166,7 +205,7 @@ class CoreTests(unittest.TestCase):
   atomic(v2/'coverage.json',manifest)
   activate(self.config,'v2',v2)
   self.assertEqual(snapshot(self.store,'v2','phone-a')['pages']['welcome']['status'],'default')
-  self.assertEqual(snapshot(self.store,'v2','phone-b')['pages']['welcome']['status'],'confirmed')
+  self.assertEqual(snapshot(self.store,'v2','phone-b')['pages']['welcome']['status'],'default')
   v3=self.root/'designs/v3'
   shutil.copytree(v2,v3)
   (v3/'preview.html').write_text('<button>Changed</button>')
@@ -243,9 +282,17 @@ class AnimationAndGuardTests(unittest.TestCase):
   from tailorbird_rig.page_checks import snapshot,confirm
   with tempfile.TemporaryDirectory() as t:
    root=Path(t)/'project';shutil.copytree(Path(__file__).parents[1]/'tailorbird_rig/starter',root);config=root/'rig.json';store=ReviewStore(config)
-   item=snapshot(store,'v1','phone-a')['pages']['welcome'];confirm(store,dict(revision='v1',page='welcome',device='phone-a',**{k:item[k] for k in ('content_sha256','feedback_sha256')}))
-   candidate=root/'designs/v2';shutil.copytree(root/'designs/v1',candidate);system=json.loads((candidate/'design-system.json').read_text());system['tokens']['radius']=24;atomic(candidate/'design-system.json',system);activate(config,'v2',candidate)
+   v1=root/'designs/v1';manifest=read(v1/'coverage.json',{})
+   manifest['component_usage']={'welcome':['primary-action'],'form':['secondary-action']}
+   atomic(v1/'coverage.json',manifest)
+   for page in ('welcome','form'):
+    item=snapshot(store,'v1','phone-a')['pages'][page];confirm(store,dict(revision='v1',page=page,device='phone-a',**item))
+   candidate=root/'designs/v2';shutil.copytree(v1,candidate)
+   system=read(candidate/'design-system.json',{})
+   next(c for c in system['components'] if c['id']=='primary-action')['tokens']={'radius':24}
+   atomic(candidate/'design-system.json',system);activate(config,'v2',candidate)
    self.assertEqual(snapshot(store,'v2','phone-a')['pages']['welcome']['status'],'default')
+   self.assertEqual(snapshot(store,'v2','phone-a')['pages']['form']['status'],'confirmed')
  def test_authoring_and_rebuild(self):
   from tailorbird_rig.lottie_tools import build_animation,inspect_animation,create_bundle
   for motion in ['bounce','pulse','draw']:
