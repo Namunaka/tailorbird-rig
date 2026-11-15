@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "sealed_at": "2026-11-09T15:06:57.670180+00:00",
-  "maintenance_reason": "新增项目级特效库和能力组件库",
+  "sealed_at": "2026-11-15T03:51:31.473992+00:00",
+  "maintenance_reason": "在画布工具栏增加隔离交互稿重放",
   "files": {
     "store.py": "e22c3bbf7c462d697a0b833b2258eea5eb20dae4870ae0dcd41ede6676ba16bd",
     "server.py": "021734381fcb06c556d4f779c442bedc5277a1c3f3da9fc42e43823866ea2925",
@@ -30,7 +30,7 @@
     "web/components-view.js": "4d06179044e49ee93dbe6b9705fe19f8a1db88e2b10ef6c9f99b33574a427312",
     "web/issues.html": "6e3b4bfba6370f18963ab63b784e368439e1898baa2cec30f4bb3d70a59d05b4",
     "web/component-kit.css": "81c47da8d19f926a9c1f1c4dedd1c7582ffff4bcff7246420d819a8bdc0433be",
-    "web/viewer.js": "69ce57f4c6d6f79d2cd5f675387e6f43fe2112be557a0d22c012128e418662cc",
+    "web/viewer.js": "52d858a3a83f44d113895bfe94bff27a253f9c7a68c6d0ee5a47e66736b05237",
     "web/component-kit.js": "63a932c225e741cee50052f9bff3501f97550431b7aa3d5cdef1ce440fe0404f",
     "web/viewer.css": "68a100d9e8ed1970e266d086d5e3b8b01a6f0937270a4569d98abd13e0377e0a",
     "web/page-doc.js": "8a37a694079b8a28e247b02805207842bdcd0cd54a836a32c6e63835cbc2644f",

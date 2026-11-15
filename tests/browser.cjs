@@ -321,9 +321,27 @@ const check=(name,pass)=>{checks.push({name,pass});if(!pass)throw Error(name)};
  await p.locator('#page-check-confirm').click();
  await p.locator('#page-check-confirm[aria-pressed=true]').waitFor();
  check('live preview uses the selected device and existing confirmation',p.url().endsWith('#form@phone-b')&&await p.locator('.live-preview-frame').isVisible());
+ const replay=p.getByRole('button',{name:'重放',exact:true});
+ const reviewUrl=p.url(),frame=p.locator('.live-preview-frame'),originalSrc=await frame.getAttribute('src');
+ await p.locator('.live-preview-tools').evaluate(tools=>{tools.dataset.unsavedDraft='draft'});
+ check('replay sits immediately after the live mode toggle',
+  await replay.evaluate(button=>button.previousElementSibling.textContent==='查看静态图'));
+ for(let i=0;i<2;i++){
+  const reloaded=p.waitForRequest(new URL(originalSrc,reviewUrl).href);
+  await replay.click();
+  await reloaded;
+  await tryAction.waitFor();
+  check('replay resets the interaction with the same page and device, attempt '+(i+1),
+   await frame.getAttribute('src')===originalSrc&&await live.locator('output').textContent()==='');
+  await tryAction.click();
+  await live.locator('output').getByText('phone-b '+logicalWidth('phone-b')+' true',{exact:true}).waitFor();
+ }
+ check('replay keeps the outer URL, unsaved state and confirmation',
+  p.url()===reviewUrl&&await p.locator('.live-preview-tools').getAttribute('data-unsaved-draft')==='draft'&&
+  await p.locator('#page-check-confirm').getAttribute('aria-pressed')==='true');
  await p.getByRole('button',{name:'查看静态图'}).click();
  await p.locator('#image').waitFor();
- check('the canvas toggles to its static reference',await p.locator('.live-preview-frame').count()===0&&
+ check('the canvas toggles to its static reference and hides replay',!await replay.isVisible()&&await p.locator('.live-preview-frame').count()===0&&
   (await p.locator('#image').getAttribute('src')).endsWith('/screens/phone-b/form.png'));
  await p.getByRole('button',{name:'试用交互稿'}).click();
  await tryAction.waitFor();

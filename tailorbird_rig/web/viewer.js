@@ -64,8 +64,11 @@ var C,state,device,draw,resolveState,RIG;
  previewTools.className = 'live-preview-tools';
  const previewToggle = document.createElement('button');
  previewToggle.type = 'button';
+ const previewReplay = document.createElement('button');
+ previewReplay.type = 'button';
+ previewReplay.textContent = '重放';
  const previewHint = document.createElement('small');
- previewTools.append(previewToggle, previewHint);
+ previewTools.append(previewToggle, previewReplay, previewHint);
  workspace.before(previewTools);
  let previewFrame, previewUrl, previewDevice, previewKey, showLive;
 
@@ -98,10 +101,17 @@ var C,state,device,draw,resolveState,RIG;
    fitPreview();
   }
   previewToggle.textContent = live ? '查看静态图' : '试用交互稿';
+  previewReplay.hidden = !previewFrame;
   previewHint.textContent = live ? '在设计稿一侧直接操作。' : '当前机型的静态参考图。';
  }
 
  previewToggle.onclick = () => { showLive = !workspace.classList.contains('show-live-preview'); showPreviewMode(); };
+ previewReplay.onclick = () => {
+  if (!previewFrame) return;
+  previewFrame.remove();
+  previewFrame = null;
+  showPreviewMode();
+ };
  new ResizeObserver(fitPreview).observe(image);
 
  function updatePreview(currentDevice) {
