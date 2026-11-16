@@ -34,6 +34,7 @@ class _RevisionContent:
         self.pages=set(self.manifest['states'])
         self.docs=read(confined(self.root,'page-docs.json'),{}).get('pages',{})
         self.animations={}
+        self.design_digests={}
         self.page_digests={}
         self.legacy_digests={}
 
@@ -48,19 +49,28 @@ class _RevisionContent:
             'children':[self.component_content(child) for child in component.get('children',[])],
         }
 
+    def design_parts(self,page):
+        refs=sorted(set(self.elements['usage'].get(page,[])))
+        shots=[(ident,_file_digest(covered_image(self.root,self.manifest,page,ident)))
+               for ident in sorted(self.devices)]
+        preview=self.manifest.get('live_previews',{}).get(page)
+        viewports=[(ident,self.devices[ident]['w'],self.devices[ident]['h']) for ident in sorted(self.devices)]
+        return [shots, _file_digest(confined(self.root,preview)) if preview else None,
+                viewports if preview else None,
+                [self.component_content(ref) for ref in refs],self.animation_content(page)]
+
+    def design_digest(self,page):
+        if page not in self.pages:
+            return None
+        if page not in self.design_digests:
+            self.design_digests[page]=hashlib.sha256(json.dumps(self.design_parts(page),sort_keys=True).encode()).hexdigest()
+        return self.design_digests[page]
+
     def page_digest(self,page):
         if page not in self.pages:
             return None
         if page not in self.page_digests:
-            refs=sorted(set(self.elements['usage'].get(page,[])))
-            shots=[(ident,_file_digest(covered_image(self.root,self.manifest,page,ident)))
-                   for ident in sorted(self.devices)]
-            preview=self.manifest.get('live_previews',{}).get(page)
-            viewports=[(ident,self.devices[ident]['w'],self.devices[ident]['h']) for ident in sorted(self.devices)]
-            parts=[shots, _file_digest(confined(self.root,preview)) if preview else None,
-                   viewports if preview else None,
-                   [self.component_content(ref) for ref in refs],
-                   self.animation_content(page),self.docs.get(page)]
+            parts=[*self.design_parts(page),self.docs.get(page)]
             self.page_digests[page]=hashlib.sha256(json.dumps(parts,sort_keys=True).encode()).hexdigest()
         return self.page_digests[page]
 

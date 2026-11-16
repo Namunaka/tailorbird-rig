@@ -15,7 +15,10 @@ const check=(name,pass)=>{checks.push({name,pass});if(!pass)throw Error(name)};
  }));
  fs.writeFileSync(path.join(project,'designs/v1/page-docs.json'),JSON.stringify({status:'测试夹具',pages:{form:{
   product:['说明表单功能'],sections:[{title:'实现范围',items:['保留表单输入']}],
-  cases:[{title:'表单提交',setup:['填写表单'],steps:['检查表单提交'],expected:['提交成功']}]
+  technical:{
+   requirements:[{id:'FORM-01',title:'提交表单',behavior:['合法表单可以提交'],implementation:['校验成功后才发送']}],
+   cases:[{id:'FORM-TEST-01',requirement:'FORM-01',title:'表单提交',setup:['填写表单'],steps:['检查表单提交'],expected:['提交成功']}]
+  }
  }}}));
  workspace.codex_source={thread_id:sourceId,title:'测试来源对话',cwd:'.'};
  fs.writeFileSync(config,JSON.stringify(workspace));
@@ -38,7 +41,7 @@ const check=(name,pass)=>{checks.push({name,pass});if(!pass)throw Error(name)};
  check('development progress sits below design progress and counts all devices in coverage',
   await development.locator('strong').textContent()==='4.8%'&&await development.locator('progress').evaluate(bar=>bar.value===1&&bar.max===21));
  const formRow=p.locator('#states [data-page="form"]');
- const productLink=p.locator('#review-panel [data-doc="product"]'),testLink=p.locator('#review-panel [data-doc="test"]');
+ const technicalLink=p.getByRole('link',{name:'技术文档'});
  check('review tools stay in the right panel and the directory has no document buttons',
   await p.locator('#states [data-doc],#states #review-progress,#review-tools,#review-text,#review-file,.review-overlay').count()===0&&
   await p.locator('#review-panel #page-check-controls,#review-panel #page-documents,#review-panel #review-progress').count()===3);
@@ -46,17 +49,20 @@ const check=(name,pass)=>{checks.push({name,pass});if(!pass)throw Error(name)};
  async function openDoc(link){
   const opened=context.waitForEvent('page');await link.click();return opened;
  }
- let pageDoc=await openDoc(productLink);
- await pageDoc.getByText('说明表单功能').waitFor();
- check('right-side product document opens the current page without navigating the viewer',pageDoc.url().endsWith('#product')&&p.url().endsWith('#form@phone-a'));
- await pageDoc.close();
- pageDoc=await openDoc(testLink);
- await pageDoc.getByText('检查表单提交').waitFor();
- check('test entry opens the same document at test cases',pageDoc.url().endsWith('#test')&&await pageDoc.getByText('预期结果').isVisible());
+ let pageDoc=await openDoc(technicalLink);
+ const requirement=pageDoc.locator('.doc-requirement').filter({hasText:'FORM-01'});
+ await requirement.getByText('检查表单提交').waitFor();
+ check('one technical document opens with the chosen page, feature and its test',
+  await p.locator('#page-documents a').count()===1&&p.url().endsWith('#form@phone-a')&&
+  new URL(pageDoc.url()).searchParams.get('revision')==='v1'&&await requirement.getByText('提交成功').isVisible());
+ const download=new URL(await pageDoc.locator('#doc-handoff').getAttribute('href'),base);
+ const guidance=await (await p.request.get(download.href)).text();
+ check('AI handoff carries scoped technical documents before implementation',guidance.includes('page=form')&&
+  guidance.includes('pages.form.technical')&&guidance.includes('--page form')&&guidance.includes('失败'));
  await pageDoc.close();
  await p.locator('#states [data-page="done"]').click();
- pageDoc=await openDoc(testLink);
- await pageDoc.getByText('此版本尚未关联测试文档。').waitFor();
+ pageDoc=await openDoc(technicalLink);
+ await pageDoc.getByText('此版本尚未登记该页面的技术文档。').waitFor();
  await pageDoc.close();
  await p.locator('#states [data-page="welcome"]').click();
  await p.locator('#states [data-page="welcome"]').focus();
@@ -295,6 +301,9 @@ const check=(name,pass)=>{checks.push({name,pass});if(!pass)throw Error(name)};
  const coveragePath=path.join(liveRoot,'coverage.json'),coverage=JSON.parse(fs.readFileSync(coveragePath,'utf8'));
  coverage.live_previews={form:'preview.html'};
  fs.writeFileSync(coveragePath,JSON.stringify(coverage));
+ const liveDocsPath=path.join(liveRoot,'page-docs.json'),liveDocs=JSON.parse(fs.readFileSync(liveDocsPath));
+ liveDocs.pages.form.technical.cases[0].expected.push('交互预览使用当前机型画幅');
+ fs.writeFileSync(liveDocsPath,JSON.stringify(liveDocs));
  fs.writeFileSync(path.join(liveRoot,'preview.html'),`<!doctype html><button>Try action</button><output></output>
  <script>
  const output=document.querySelector('output');

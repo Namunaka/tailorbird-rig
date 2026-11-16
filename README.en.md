@@ -33,7 +33,7 @@ The starter contains 3 page states, 7 size/form presets, 21 synthetic images, an
 ## Reviewing and giving feedback
 
 1. Select a page on the left and a target size or foldable form at the top. Open the original image or switch to a historical revision when needed.
-2. Use the right panel to open the current product and test documents, confirm the design, and check project progress.
+2. Use the right panel to open the page's technical documentation, confirm the design, and check project progress.
 3. Send new feedback and screenshots directly in the conversation. Use **Copy pending feedback** or **Download handoff** to share existing issues.
 4. The agent addresses feedback, records results and evidence, and publishes a separate design revision.
 5. The latest revision updates in the same tab so you can continue reviewing.
@@ -43,6 +43,8 @@ Existing feedback retains the page, device, revision, source image SHA256, attac
 When the selected page and device have valid Alpha evidence, the center shows the design on the left and the simulator screenshot on the right. Both originals can be opened, and the images stack on narrow screens.
 
 Each page button has two independent bands. The top fills green as devices pass design review and shows red for changes requested or amber for re-review. The bottom fills dark green as device tests pass. **Confirm review** applies to the current page and device. The right panel shows totals across all page–device pairs. Publishing a changed page resets design and development progress for all its devices and removes its Alpha badges until retested. Unaffected pages retain their progress.
+
+The **Technical Docs** panel links to the selected design, its requirements, and the tests for each requirement. The AI handoff includes these links and the test-first workflow. Projects can set `require_technical_docs` to require updated specifications and tests when publishing new or changed designs. See the [feature contract](docs/feature-contract.md).
 
 ## Creating interfaces and continuing in a new chat
 

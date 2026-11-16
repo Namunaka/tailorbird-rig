@@ -34,9 +34,12 @@ def main():
     start=sub.add_parser('start');start.add_argument('project');start.add_argument('--port',type=int,default=18766)
     check=sub.add_parser('check');check.add_argument('project');check.add_argument('--revision')
     check.add_argument('--require-alpha',action='store_true',help='Require complete simulator evidence for the selected or current revision')
+    check.add_argument('--require-technical-docs',action='store_true',help='Require complete technical specifications and test coverage')
+    check.add_argument('--page',help='Limit the technical documentation check to one page ID')
     components=sub.add_parser('components');components.add_argument('project');components.add_argument('--revision')
     imp=sub.add_parser('import-review');imp.add_argument('--store',required=True);imp.add_argument('--workspace',required=True);imp.add_argument('--output',required=True)
     feed=sub.add_parser('feedback');feed.add_argument('project');feed.add_argument('--format',choices=['json','markdown'],default='markdown')
+    feed.add_argument('--revision');feed.add_argument('--page');feed.add_argument('--device')
     rev=sub.add_parser('publish');rev.add_argument('project');rev.add_argument('--revision',required=True);rev.add_argument('--root',required=True)
     issue=sub.add_parser('resolve');issue.add_argument('project');issue.add_argument('number',type=int);issue.add_argument('--resolution',required=True);issue.add_argument('--evidence',required=True);issue.add_argument('--status',default='已完成（设计）')
     guard=sub.add_parser('framework');guard.add_argument('action',choices=['verify','seal']);guard.add_argument('--maintenance',action='store_true');guard.add_argument('--reason',default='')
@@ -70,15 +73,28 @@ def main():
             print(start(args.project,args.port))
         elif args.command=='check':
             p=Project(args.project);count=0
-            revisions=[args.revision or p.current] if args.revision or args.require_alpha else list(p.revisions)
-            for revision in revisions:count+=p.validate_assets(revision,require_alpha=args.require_alpha)
-            print(json.dumps({'project':p.id,'revisions':len(revisions),'images':count,'ok':True}))
+            if args.page and not args.require_technical_docs:
+                raise ValueError('--page requires --require-technical-docs')
+            revisions=[args.revision or p.current] if args.revision or args.require_alpha or args.require_technical_docs else list(p.revisions)
+            for revision in revisions:
+                if not args.require_technical_docs or args.require_alpha:
+                    count+=p.validate_assets(revision,require_alpha=args.require_alpha)
+                if args.require_technical_docs:
+                    from .technical_docs import validate_technical_pages
+                    validate_technical_pages(p,revision,args.page)
+            result={'project':p.id,'revisions':len(revisions),'ok':True}
+            if not args.require_technical_docs or args.require_alpha:
+                result['images']=count
+            if args.require_technical_docs:
+                result['technical_docs']=args.page or 'all'
+            print(json.dumps(result))
         elif args.command=='components':
             from .components import load
             print(json.dumps(load(Project(args.project),args.revision),ensure_ascii=False,indent=2))
         elif args.command=='feedback':
             from .workflow import handoff
-            result=handoff(args.project);print(json.dumps(result,ensure_ascii=False,indent=2) if args.format=='json' else result['markdown'])
+            result=handoff(args.project,args.revision,args.page,args.device)
+            print(json.dumps(result,ensure_ascii=False,indent=2) if args.format=='json' else result['markdown'])
         elif args.command=='publish':
             from .workflow import activate
             activate(args.project,args.revision,args.root);print('Published '+args.revision+'; refresh the existing browser tab')

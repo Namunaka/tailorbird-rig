@@ -52,8 +52,10 @@ class Handler(BaseHTTPRequestHandler):
             if path=='/healthz': self.respond(200,{'ok':True,'project':project.id,'workspace':project.public()['storageKey']}); return
             if path=='/api/handoff':
                 from .workflow import handoff
-                data=handoff(self.server.config)
-                if parse_qs(urlsplit(self.path).query).get('format')==['markdown']:self.respond(200,data['markdown'].encode(),'text/markdown; charset=utf-8')
+                query=parse_qs(urlsplit(self.path).query)
+                data=handoff(self.server.config, self.revision, query.get('page',[None])[0],
+                             query.get('device',[None])[0], 'http://'+self.headers['Host'])
+                if query.get('format')==['markdown']:self.respond(200,data['markdown'].encode(),'text/markdown; charset=utf-8')
                 else:self.respond(200,data)
                 return
             if path=='/api/project': self.respond(200,project.public(self.revision)); return

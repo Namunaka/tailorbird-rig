@@ -12,7 +12,7 @@
 | 改版失效 | 任一机型稿、该页交互稿、关联动画、引用组件或逐页文档发生变化时，整页所有机型的确认、开发测试与 Alpha 重置。其他页面延续原进度，历史版本保留 |
 | 开发截图对照 | 当前页面与机型有有效 Alpha 证据时，中央左侧默认显示静态设计稿，右侧显示模拟器截图，各自可打开原图。窄屏上下排列，交互稿可在设计稿一侧试用 |
 | 三栏看稿 | 左侧页面目录，中间静态图或交互稿，右侧检查确认、文档和两项项目进度；窄屏可重排 |
-| 逐页文档 | 右侧「产品文档」「测试文档」随当前页面、机型和版本更新，分别在新标签页定位产品说明和测试用例 |
+| 逐页文档 | 右侧只提供「技术文档」，随当前页面、机型和版本更新。技术文档并排展示设计稿，每个功能下列出行为、实现约束和对应测试 |
 | 方向键导航 | ↑↓ 按左侧目录顺序切换页面，←→ 按顶部顺序切换机型和折叠形态；到列表边界停止；输入文字和打开设置时暂停 |
 | 反馈 | 截图可直接发给对话；既有评审记录可从问题记录、批注数据和交接入口查看或导出，保留问题号、版本、机型、源图 SHA256 与附件 |
 | 问题交接 | 复制/下载清单或CLI导出；包含问题号、版本、页面、设备、坐标、源图哈希和附图路径 |
@@ -28,7 +28,25 @@
 {"pages":{"welcome":{"phone-a":{"status":"alpha","environment":"simulator","result":"passed","build":"alpha.42","screenshot":"evidence/phone-a/welcome.png","summary":"启动后进入欢迎页，登录按钮可操作。","report":"evidence/phone-a/welcome.html"}}},"exclusions":{"welcome":{"phone-b":{"kind":"out_of_scope","reason":"用户指定本轮仅开发 phone-a"}}}}
 ```
 
-逐页文档放在各版本根目录的 `page-docs.json`。用 `pages` 按 `coverage.json` 的页面 ID 映射。每页支持 `product`（功能摘要）、`test`（补充测试说明）、`sections`（含 `title` 和 `items`）与 `cases`（含 `title`、`setup`、`steps` 和 `expected`）。正文、条目和用例各字段使用纯文本，列表字段使用字符串数组。可加顶层 `status` 标明评审稿或验证状态。文档页提供对应机型设计稿预览，未关联内容时明确提示。
+逐页技术文档使用版本目录内的 `page-docs.json`。每个页面在 `pages.<page>.technical` 下按功能列出规格与验收用例。
+
+```json
+{
+  "pages": {
+    "form": {
+      "technical": {
+        "requirements": [{"id":"FR-01","title":"提交表单","behavior":["合法输入可以提交"],"implementation":["校验通过后才调用保存接口"]}],
+        "cases": [{"id":"TC-01","requirement":"FR-01","title":"拒绝空值","setup":["打开未填写的表单"],"steps":["点击提交"],"expected":["显示必填错误且没有保存请求"]}],
+        "references": [{"label":"表单接口契约","path":"docs/form-api.md"}]
+      }
+    }
+  }
+}
+```
+
+功能与用例 ID 在页内各自唯一，每个功能至少关联一个用例。规格需说明相关的数据、接口、状态、权限和错误边界。用例需有操作和可判定的预期结果，`setup` 可选。可选引用路径必须在当前版本目录内。按功能 ID 先写对应测试，确认失败后再实现、重构和回归，交付时记录用例 ID、执行命令与结果。旧稿的 `product`、`sections`、`test`、`cases` 仍在同一文档页展示，缺少结构化规格时标为待补齐，原 `#product` / `#test` 链接仍可定位。
+
+开发前运行 `tailorbird-rig check PROJECT --revision REVISION --require-technical-docs --page PAGE`。省略 `--page` 可检查该版本所有页面。发布会检查已登记的技术规格，若设计稿、关联预览、动画或引用组件有变化且技术内容原样复制，则拒绝发布。项目可设置 `require_technical_docs: true`，要求所有新增与改动页面补齐，其他旧页可逐步接入。技术文档对受影响的设计变更应写入具体的实现或测试调整，纯视觉变更同步可复验的视觉断言。
 
 文件大小限制：单张附图8 MB、最多4000万像素，每条评论最多8张；PNG/JPG/WebP。评论最多6000字。幂等请求记录最近5000个操作。服务仅在回环地址监听，读文件限定在显式项目根/资源根内，不提供目录遍历。
 
@@ -38,7 +56,7 @@
 
 导出和 Codex 交接同时附开发验收要求。实际开发或重测时，逐页逐机型执行测试用例并记录结果；宣布完成前运行 `tailorbird-rig check PROJECT --revision REVISION --require-alpha`。该命令对指定版本核验所有页面的证据和明确例外。普通设计校验允许尚无开发证据。
 
-从工具栏复制或下载待处理问题，即可把已保存的反馈交给来源对话。项目可通过 `rig.json` 的 `codex_source` 记录来源对话的 `thread_id`、`title` 和 `cwd`，相对目录以 `rig.json` 所在目录为准。本机接口 `/api/codex-work` 继续兼容已有调用方。
+从工具栏复制或下载交接时，会带上所选版本、页面和机型，并列出当前页和待处理问题对应的设计稿、技术文档及引用。交接 JSON 提供 `technical_documents` 和 `technical_guidance`，技术文档页也可下载当前页交接。项目可通过 `rig.json` 的 `codex_source` 记录来源对话的 `thread_id`、`title` 和 `cwd`，相对目录以 `rig.json` 所在目录为准。本机接口 `/api/codex-work` 继续兼容已有调用方。
 
 交接保留批注的原问题号、页面及机型。Codex 结合用户补充和当前设计稿，对照同一功能的各机型、折叠形态及相关状态，判断影响范围，修复所有受影响的变体，并在原问题下记录覆盖范围与验证结果。
 

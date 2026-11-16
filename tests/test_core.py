@@ -39,6 +39,38 @@ class CoreTests(unittest.TestCase):
   (root/'screens/phone-a/welcome.png').unlink()
   with self.assertRaises(ValueError):activate(self.config,'v3',root)
   self.assertEqual(Project(self.config).current,'v2')
+ def test_technical_specs_follow_design_revisions(self):
+  from tailorbird_rig.technical_docs import validate_technical_pages
+  project=Project(self.config)
+  atomic(self.config,{**project.raw,'require_technical_docs':True})
+  old,_=project.revision()
+  new=self.root/'designs/v2';shutil.copytree(old,new)
+  shutil.copyfile(new/'screens/phone-a/form.png',new/'screens/phone-a/welcome.png')
+  with self.assertRaisesRegex(ValueError,'须补齐开发规格'):
+   activate(self.config,'v2',new)
+  spec={'requirements':[{'id':'FR-01','title':'入口','behavior':['显示入口'],'implementation':['可用时接收点击']}],
+        'cases':[{'id':'TC-01','title':'入口可用','requirement':'FR-01','steps':['打开页面'],'expected':['入口可见']}]}
+  path=new/'page-docs.json';atomic(path,{'pages':{'welcome':{'technical':spec}}})
+  activate(self.config,'v2',new)
+  project=Project(self.config)
+  validate_technical_pages(project,'v2','welcome')
+  handoff_doc=handoff(self.config,'v2','welcome','phone-b')['technical_documents'][0]
+  self.assertTrue(handoff_doc['ready'])
+  self.assertEqual(handoff_doc['specification'],spec)
+  latest=self.root/'designs/v3';shutil.copytree(new,latest)
+  shutil.copyfile(old/'screens/phone-b/form.png',latest/'screens/phone-b/welcome.png')
+  with self.assertRaisesRegex(ValueError,'同步更新'):
+   activate(self.config,'v3',latest)
+  self.assertEqual(Project(self.config).current,'v2')
+  spec['cases'][0]['expected'].append('手机 B 的按钮在可操作区域内')
+  spec['requirements'].append({'id':'FR-02','title':'返回','behavior':['退回主页'],'implementation':['保留输入状态']})
+  atomic(latest/'page-docs.json',{'pages':{'welcome':{'technical':spec}}})
+  with self.assertRaisesRegex(ValueError,'FR-02'):
+   activate(self.config,'v3',latest)
+  spec['cases'].append({'id':'TC-02','title':'返回主页','requirement':'FR-02','steps':['按返回键'],'expected':['可见主页']})
+  atomic(latest/'page-docs.json',{'pages':{'welcome':{'technical':spec}}})
+  activate(self.config,'v3',latest)
+  self.assertNotEqual(handoff(self.config,'v2','welcome')['technical_documents'][0]['specification'],spec)
  def test_journal_recovery(self):
   atomic(self.store.root/'review-pending.json',{'issues':{'next_issue_number':9,'issues':[]},'annotations':{'marks':[],'operations':[]}})
   self.store.snapshot();self.assertEqual(read(self.store.root/'issues.json',{})['next_issue_number'],9);self.assertFalse((self.store.root/'review-pending.json').exists())

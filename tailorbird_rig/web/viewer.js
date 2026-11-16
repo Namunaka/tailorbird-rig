@@ -18,9 +18,10 @@ var C,state,device,draw,resolveState,RIG;
  $('#tool-project-links').hidden=!$('#links').children.length;
  $('#export').href='/api/review?revision='+encodeURIComponent(RIG.revision);
  const handoffLabel=$('#handoff-label');
+ const pageContext=()=>new URLSearchParams({revision:RIG.revision,page:state,device});
  $('#handoff').onclick=async()=>{
   try{
-   const r=await fetch('/api/handoff');if(!r.ok)throw Error('导出失败');
+   const r=await fetch('/api/handoff?'+pageContext());if(!r.ok)throw Error('导出失败');
    const data=await r.json();await navigator.clipboard.writeText(data.markdown);
    handoffLabel.textContent='已复制问题清单';setTimeout(()=>handoffLabel.textContent='复制待处理问题',2000);
   }catch(e){$('#error').textContent='无法复制，请使用工具栏的「下载问题交接」。'}
@@ -38,10 +39,9 @@ var C,state,device,draw,resolveState,RIG;
   showPageDevelopment(button);
  }
  function updatePageDocs(){
-  const query=new URLSearchParams({revision:RIG.revision,page:state,device});
-  for(const link of $('#page-documents').querySelectorAll('[data-doc]')){
-   link.href='/assets/page-doc.html?'+query+'#'+link.dataset.doc;
-  }
+  const query=pageContext();
+  $('[data-doc=technical]').href='/assets/page-doc.html?'+query;
+  $('#handoff-download').href='/api/handoff?'+query+'&format=markdown';
  }
  let implementation={};
  const developmentByPage=new Map();

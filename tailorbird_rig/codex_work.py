@@ -6,7 +6,7 @@ import subprocess
 import threading
 from uuid import UUID
 
-from .workflow import SCOPE_GUIDANCE, handoff
+from .workflow import handoff
 
 
 class WorkError(ValueError):
@@ -62,7 +62,8 @@ class CodexWork:
                 f'当前版本：{revision}\n'
                 f'待处理问题编号：{numbers}\n'
                 '请用项目的 feedback 命令重新读取这些待处理问题，查看原稿、批注和附图，按原编号修改。\n'
-                f'{SCOPE_GUIDANCE}\n'
+                f'{bundle["scope_guidance"]}\n'
+                f'{bundle["technical_markdown"]}\n'
                 f'{bundle["alpha_guidance"]}\n'
                 f'{bundle["alpha_check"]}\n'
                 '按项目的评审约定发布新修订、回写已解决问题，保留历史版本与批注。'

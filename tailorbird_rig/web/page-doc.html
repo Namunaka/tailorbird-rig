@@ -3,7 +3,7 @@
 <head>
  <meta charset="utf-8">
  <meta name="viewport" content="width=device-width,initial-scale=1">
- <title>产品与测试文档 · Tailorbird Rig</title>
+ <title>技术文档 · Tailorbird Rig</title>
  <link rel="stylesheet" href="/assets/viewer.css">
  <style>
  .document{max-width:1120px;margin:auto;padding:clamp(16px,4vw,48px);display:block}
@@ -18,8 +18,10 @@
  .doc-section ul,.doc-section ol{padding-inline-start:24px}
  .doc-section li{margin-block:7px}
  .doc-case{padding-top:12px;border-top:1px solid #ffffff20;margin-top:14px}
- .doc-case h3,.doc-case h4{margin:0 0 5px}
- .doc-case h4{color:#a6c7ed;font-size:13px}
+ .doc-case h4,.doc-case h5{margin:0 0 5px}
+ .doc-case h5{color:#a6c7ed;font-size:13px}
+ .doc-requirement{border-top:1px solid #ffffff20;margin-top:16px;padding-top:14px}
+ .doc-requirement h3{margin:0 0 8px}
  .doc-preview{align-self:start}
  .doc-preview img{display:block;max-width:100%;max-height:560px;margin:10px auto}
  .doc-preview label,.doc-preview select{display:block;width:100%}
@@ -29,19 +31,19 @@
 <body>
  <main class="document">
   <header>
-   <div class="brand">TAILORBIRD RIG · 产品与测试文档</div>
+   <div class="brand">TAILORBIRD RIG · 技术文档</div>
    <h1 id="doc-title">正在读取设计稿…</h1>
    <p id="doc-meta" role="status"></p>
    <nav aria-label="文档目录" hidden>
-    <a class="tool-link" href="#product">产品说明</a>
-    <a class="tool-link" href="#test">测试用例</a>
     <a class="tool-link" id="doc-review">打开对应评审稿</a>
+    <a class="tool-link" id="doc-handoff" download="tailorbird-feedback.md">下载 AI 开发交接</a>
    </nav>
   </header>
   <div class="doc-layout" hidden>
    <div>
-    <section class="doc-section" id="product"><h2>产品说明</h2><div></div></section>
-    <section class="doc-section" id="test"><h2>测试用例</h2><div></div></section>
+    <section class="doc-section" id="technical"><h2>开发规格与测试</h2><div></div></section>
+    <section class="doc-section" id="product" hidden><h2>既有功能说明</h2><div></div></section>
+    <section class="doc-section" id="test" hidden><h2>既有测试用例</h2><div></div></section>
    </div>
    <section class="doc-preview" aria-labelledby="doc-preview-title">
     <h2 id="doc-preview-title">设计稿参考</h2>

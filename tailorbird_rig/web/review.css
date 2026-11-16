@@ -18,8 +18,7 @@ main {
 #review-panel p { font-size: 11px; }
 #review-panel button { min-height: 36px; margin: 0; padding: 8px 6px; font-size: 12px; }
 #page-documents { border-top: 1px solid #ffffff20; padding-top: 14px; }
-.page-doc-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.page-doc-links a { justify-content: center; }
+#page-documents a { display: flex; justify-content: center; }
 #review-progress { display: grid; gap: 8px; }
 #review-panel :is(#overall-review-progress, #development-test-progress) { margin: 0; }
 
