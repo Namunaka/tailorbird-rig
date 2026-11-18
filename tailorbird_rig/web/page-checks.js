@@ -66,7 +66,7 @@
    if(!b.closest('.device-evidence'))b.title=status==='confirmed'?'当前页面 · 已检查确认':status==='needs_work'?'当前页面 · 待修改':status==='needs_check'?'当前页面 · 待复查':'当前页面 · 尚未确认';
   }
   const checked=current?.status==='confirmed';
-  note.textContent=checked?'当前界面已检查确认，再点一次可撤回':current?.status==='needs_work'?'当前机型有标记，待修改':current?.status==='needs_check'?'修改已完成，等待复查':'当前界面尚未确认';
+  note.textContent=checked?'当前界面已检查确认，再点一次可撤回':current?.status==='needs_work'?'当前机型有标记，待修改':current?.review_reason==='design_changed'?'设计稿已变更，等待重新确认':current?.status==='needs_check'?'修改已完成，等待复查':'当前界面尚未确认';
   button.querySelector('span').textContent=checked?'已检查确认':'检查确认';
   button.setAttribute('aria-pressed',String(checked));
   button.disabled=confirming||!current||!document.querySelector('#image').complete||!document.querySelector('#image').naturalWidth;

@@ -21,27 +21,27 @@ def implementation_report(project, revision):
                 declarations[page].append((index,folder,entries,data.get('exclusions',{}).get(page,{})))
 
     content={}
-    def digest(index,page):
+    def digest(index,page,device):
         try:
             if index not in content:
                 content[index]=revision_content(project,revisions[index])
-            return content[index].page_digest(page)
+            return content[index].test_digest(page,device)
         except (ValueError,KeyError,FileNotFoundError):
             return None
 
     report={'pages':{},'exclusions':{}}
     for page,history in declarations.items():
-        start=len(revisions)-1
-        current=digest(start,page)
-        if current is None:
-            continue
-        while start>history[0][0] and digest(start-1,page)==current:
-            start-=1
         index,folder,entries,exclusions=history[-1]
-        if index<start:
-            continue
         passing={}
         for device in devices & entries.keys():
+            start=len(revisions)-1
+            current=digest(start,page,device)
+            if current is None:
+                continue
+            while start>history[0][0] and digest(start-1,page,device)==current:
+                start-=1
+            if index<start:
+                continue
             entry=entries[device]
             try:
                 screenshot=validate_alpha_entry(folder,entry)

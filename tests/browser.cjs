@@ -188,7 +188,11 @@ const check=(name,pass)=>{checks.push({name,pass});if(!pass)throw Error(name)};
  await p.locator('#page-check-confirm').click();await p.waitForFunction(()=>document.querySelector('#states [data-page="done"]').dataset.check==='partial');
  fs.cpSync(path.join(project,'designs/v2'),path.join(project,'designs/v3'),{recursive:true});fs.copyFileSync(path.join(project,'designs/v3/screens/phone-c/welcome.png'),path.join(project,'designs/v3/screens/phone-c/done.png'));
  cp.execFileSync(python,['-m','tailorbird_rig','publish',config,'--revision','v3','--root',path.join(project,'designs/v3')],{cwd:root});
- await p.waitForFunction(()=>document.querySelector('#revision')?.value==='v3');await p.locator('#page-check-confirm:not([disabled])').waitFor();check('changed draft resets navigation to default',await nav.getAttribute('data-check')==='default');
+ await p.waitForFunction(()=>document.querySelector('#revision')?.value==='v3');await p.locator('#page-check-confirm:not([disabled])').waitFor();
+ check('previously accepted changed draft is amber and asks for confirmation again',
+  await nav.getAttribute('data-check')==='needs_check'&&
+  await reviewedDevice.getAttribute('data-check')==='needs_check'&&
+  await p.locator('#page-check-state').textContent()==='设计稿已变更，等待重新确认');
  check('confirmation history stays on original draft',(await(await p.request.get(base+'/api/page-checks?revision=v2&device=phone-c')).json()).pages.done.status==='confirmed');
  const confirmAll=p.locator('#page-check-all');
  const singleBox=await confirmation.boundingBox(),allBox=await confirmAll.boundingBox();
@@ -366,6 +370,18 @@ const check=(name,pass)=>{checks.push({name,pass});if(!pass)throw Error(name)};
  await tryAction.click();
  check('interactive preview remains usable on the left with the simulator screenshot on the right',
   await capture.isVisible()&&await live.locator('output').getByText('phone-a '+logicalWidth('phone-a')+' true',{exact:true}).isVisible());
+ await p.locator('#page-check-confirm[aria-pressed=false]:enabled').click();
+ await p.locator('#page-check-confirm[aria-pressed=true]:enabled').waitFor();
+ const acceptedPercent=await formRow.locator('.page-review-percent').textContent();
+ fresh.pages.form['phone-a'].summary='更新后的开发测试报告';
+ fresh.pages.form['phone-a'].build='fixture.3';
+ fs.writeFileSync(evidencePath,JSON.stringify(fresh));
+ await p.reload();
+ await p.locator('#page-check-confirm[aria-pressed=true]:enabled').waitFor();
+ await p.locator('#devices [data-device="phone-a"] .device-alpha').waitFor();
+ check('updating development evidence and refreshing keeps the human design confirmation',
+  await formRow.locator('.page-review-percent').textContent()===acceptedPercent&&
+  await formRow.locator('.page-development-percent').textContent()==='测试 14.3%');
  await p.locator('#states [data-page="welcome"]').click();
  check('ordinary design pages have no live canvas controls',await p.locator('.live-preview-frame').count()===0&&!(await p.locator('.live-preview-tools').isVisible()));
  for(const width of [980,390]){await p.setViewportSize({width,height:844});check('responsive workspace '+width,await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))}

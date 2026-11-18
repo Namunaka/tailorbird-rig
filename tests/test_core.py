@@ -84,7 +84,7 @@ class CoreTests(unittest.TestCase):
    directory=self.root/'designs'/revision;shutil.copytree(self.root/'designs/v1',directory)
    if changed:shutil.copyfile(directory/'screens/phone-a/form.png',directory/'screens/phone-a/welcome.png')
    activate(self.config,revision,directory)
-   self.assertEqual(status()['status'],'confirmed' if revision=='v2' else 'default')
+   self.assertEqual(status()['status'],'confirmed' if revision=='v2' else 'needs_check')
   self.assertEqual(snapshot(self.store,'v1','phone-a')['pages']['welcome']['status'],'confirmed')
  def test_fixed_feedback_yellow_and_stale_confirmation(self):
   from tailorbird_rig.page_checks import snapshot,confirm
@@ -97,6 +97,32 @@ class CoreTests(unittest.TestCase):
   confirm(self.store,dict(revision='v1',page='welcome',device='phone-a',**{k:status()[k] for k in ('content_sha256','feedback_sha256')}))
   self.assertEqual(status()['status'],'confirmed')
   self.store.apply(self.event('comment',text='再调整字号'));self.assertEqual(status()['status'],'needs_work')
+ def test_changed_accepted_design_stays_yellow_until_reviewed(self):
+  from tailorbird_rig.page_checks import snapshot,confirm
+  def status(revision):
+   return snapshot(ReviewStore(self.config),revision,'phone-a','welcome',True)
+  def accept(revision,desired=True):
+   check=status(revision)['pages']['welcome']
+   confirm(self.store,dict(revision=revision,page='welcome',device='phone-a',confirmed=desired,**check))
+  accept('v1')
+  v2=self.root/'designs/v2';shutil.copytree(self.root/'designs/v1',v2)
+  shutil.copyfile(v2/'screens/phone-a/form.png',v2/'screens/phone-a/welcome.png')
+  activate(self.config,'v2',v2)
+  changed=status('v2')
+  self.assertEqual(changed['pages']['welcome']['status'],'needs_check')
+  self.assertEqual(changed['pages']['welcome']['review_reason'],'design_changed')
+  self.assertTrue(changed['progress']['welcome']['needs_check'])
+  self.assertEqual(changed['device_statuses']['welcome']['phone-b'],'default')
+  self.store.apply(self.add(revision='v2'))
+  self.assertEqual(status('v2')['pages']['welcome']['status'],'needs_work')
+  self.store.apply(self.event('delete'))
+  self.assertEqual(status('v2')['pages']['welcome']['status'],'needs_check')
+  accept('v2')
+  v3=self.root/'designs/v3';shutil.copytree(v2,v3);activate(self.config,'v3',v3)
+  self.assertEqual(status('v3')['pages']['welcome']['status'],'confirmed')
+  accept('v3',False)
+  v4=self.root/'designs/v4';shutil.copytree(self.root/'designs/v1',v4);activate(self.config,'v4',v4)
+  self.assertEqual(status('v4')['pages']['welcome']['status'],'default')
  def test_progress_counts_every_page_device_and_bare_mark(self):
   from tailorbird_rig.page_checks import snapshot,confirm
   _,manifest=Project(self.config).revision('v1')
@@ -175,7 +201,7 @@ class CoreTests(unittest.TestCase):
   atomic(path,data)
   with self.assertRaisesRegex(ValueError,'Expected passing Alpha simulator evidence'):
    project.validate_assets()
- def test_changed_page_resets_all_devices_and_ignores_copied_alpha(self):
+ def test_changed_device_preserves_other_confirmations_and_alpha(self):
   from tailorbird_rig.implementation import implementation_report
   from tailorbird_rig.page_checks import snapshot,confirm
   v1,manifest=Project(self.config).revision('v1')
@@ -201,11 +227,12 @@ class CoreTests(unittest.TestCase):
   activate(self.config,'v2',v2)
   project=Project(self.config)
   review=snapshot(self.store,'v2','phone-b')['progress']
-  self.assertEqual(review['welcome']['confirmed'],0)
+  self.assertEqual(review['welcome']['confirmed'],len(devices)-1)
   self.assertEqual(review['form']['confirmed'],len(devices))
   self.assertEqual(snapshot(self.store,'v1','phone-b')['progress']['welcome']['confirmed'],len(devices))
   report=implementation_report(project,'v2')['pages']
-  self.assertEqual(report['welcome'],{})
+  self.assertNotIn('phone-a',report['welcome'])
+  self.assertEqual(len(report['welcome']),len(devices)-1)
   self.assertEqual(report['form']['phone-b']['revision'],'v1')
   self.assertEqual(len(implementation_report(project,'v1')['pages']['welcome']),len(devices))
   with self.assertRaisesRegex(ValueError,'待重测'):
@@ -236,13 +263,13 @@ class CoreTests(unittest.TestCase):
   manifest['devices'][0]['w']+=10
   atomic(v2/'coverage.json',manifest)
   activate(self.config,'v2',v2)
-  self.assertEqual(snapshot(self.store,'v2','phone-a')['pages']['welcome']['status'],'default')
-  self.assertEqual(snapshot(self.store,'v2','phone-b')['pages']['welcome']['status'],'default')
+  self.assertEqual(snapshot(self.store,'v2','phone-a')['pages']['welcome']['status'],'needs_check')
+  self.assertEqual(snapshot(self.store,'v2','phone-b')['pages']['welcome']['status'],'confirmed')
   v3=self.root/'designs/v3'
   shutil.copytree(v2,v3)
   (v3/'preview.html').write_text('<button>Changed</button>')
   activate(self.config,'v3',v3)
-  self.assertEqual(snapshot(self.store,'v3','phone-b')['pages']['welcome']['status'],'default')
+  self.assertEqual(snapshot(self.store,'v3','phone-b')['pages']['welcome']['status'],'needs_check')
   self.assertEqual(snapshot(self.store,'v1','phone-a')['pages']['welcome']['status'],'confirmed')
  def test_withdrawing_inherited_confirmation_keeps_history(self):
   from tailorbird_rig.page_checks import snapshot,confirm
@@ -261,6 +288,41 @@ class CoreTests(unittest.TestCase):
   self.assertEqual(snapshot(self.store,'v3','phone-a')['pages']['welcome']['status'],'default')
   self.assertEqual(snapshot(self.store,'v1','phone-a')['pages']['welcome']['status'],'confirmed')
   self.assertEqual(set_checked('v3',True)['overall']['confirmed'],1)
+ def test_reports_docs_refresh_and_legacy_confirmations_are_independent(self):
+  from tailorbird_rig.page_checks import snapshot,confirm,_RevisionContent
+  from tailorbird_rig.implementation import implementation_report
+  root,manifest=Project(self.config).revision()
+  docs={'pages':{'form':{'product':['提交表单'],'test':['输入合法数据并提交']}}}
+  atomic(root/'page-docs.json',docs)
+  for device in ('phone-a','phone-b'):
+   check=snapshot(self.store,'v1',device)['pages']['form']
+   confirm(self.store,dict(revision='v1',page='form',device=device,**check))
+  # Read existing page-wide records without overwriting the user's original history.
+  records=read(self.store.root/'page-checks.json',{})
+  content=_RevisionContent(Project(self.config),'v1')
+  records['records'][0]['content_sha256']=content.page_digest('form')
+  records['records'][0].pop('content_scope')
+  atomic(self.store.root/'page-checks.json',records)
+  entry=dict(status='alpha',environment='simulator',result='passed',build='test.1',
+             summary='通过',screenshot='screens/phone-a/form.png')
+  evidence={'pages':{'form':{'phone-a':entry}},
+            'exclusions':{'form':{d['id']:{'kind':'not_implemented','reason':'测试夹具仅实现 A'}
+                                  for d in manifest['devices'] if d['id']!='phone-a'}}}
+  atomic(root/'implementation-evidence.json',evidence)
+  self.assertEqual(implementation_report(Project(self.config),'v1')['pages']['form']['phone-a']['build'],'test.1')
+  self.assertEqual(snapshot(ReviewStore(self.config),'v1','phone-b')['progress']['form']['confirmed'],2)
+  latest=self.root/'designs/v2';shutil.copytree(root,latest)
+  docs['pages']['form']['test'].append('增加边界用例')
+  atomic(latest/'page-docs.json',docs)
+  activate(self.config,'v2',latest)
+  self.assertEqual(snapshot(ReviewStore(self.config),'v2','phone-a')['progress']['form']['confirmed'],2)
+  self.assertEqual(implementation_report(Project(self.config),'v2')['pages']['form'],{})
+  entry['build']='test.2'
+  atomic(latest/'implementation-evidence.json',evidence)
+  self.assertEqual(implementation_report(Project(self.config),'v2')['pages']['form']['phone-a']['build'],'test.2')
+  self.assertEqual(snapshot(ReviewStore(self.config),'v2','phone-a')['progress']['form']['confirmed'],2)
+  checks=read(self.store.root/'page-checks.json',{})
+  self.assertEqual(checks,records)
  def test_multiple_store_instances_serialize_issue_numbers(self):
   def write(n):
    store=ReviewStore(self.config);store.apply(self.add(str(n)));store.apply(self.event('comment',str(n),text=str(n)))
@@ -323,7 +385,7 @@ class AnimationAndGuardTests(unittest.TestCase):
    system=read(candidate/'design-system.json',{})
    next(c for c in system['components'] if c['id']=='primary-action')['tokens']={'radius':24}
    atomic(candidate/'design-system.json',system);activate(config,'v2',candidate)
-   self.assertEqual(snapshot(store,'v2','phone-a')['pages']['welcome']['status'],'default')
+   self.assertEqual(snapshot(store,'v2','phone-a')['pages']['welcome']['status'],'needs_check')
    self.assertEqual(snapshot(store,'v2','phone-a')['pages']['form']['status'],'confirmed')
  def test_authoring_and_rebuild(self):
   from tailorbird_rig.lottie_tools import build_animation,inspect_animation,create_bundle
